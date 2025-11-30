@@ -50,7 +50,7 @@ interface EndpointDoc {
   auth: boolean;
   roles?: string[];
   requestBody?: Record<string, unknown>;
-  responseExample?: Record<string, unknown>;
+  responseExample?: unknown;
   queryParams?: { name: string; type: string; required: boolean; description: string }[];
 }
 
