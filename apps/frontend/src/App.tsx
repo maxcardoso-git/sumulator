@@ -11,6 +11,7 @@ import { SimulatedApisPage } from './pages/SimulatedApis';
 import { ObservabilityPage } from './pages/Observability';
 import { EnvironmentsPage } from './pages/Environments';
 import { ScenariosPage } from './pages/Scenarios';
+import { ApiDocsPage } from './pages/ApiDocs';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="observability" element={<ObservabilityPage />} />
         <Route path="environments" element={<EnvironmentsPage />} />
         <Route path="scenarios" element={<ScenariosPage />} />
+        <Route path="api-docs" element={<ApiDocsPage />} />
       </Route>
     </Routes>
   );

@@ -24,6 +24,7 @@ import {
   IconChevronDown,
   IconServer,
   IconTestPipe,
+  IconBook,
 } from '@tabler/icons-react';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -37,6 +38,7 @@ const navItems = [
   { label: 'Observabilidade', icon: IconChartBar, path: '/observability' },
   { label: 'Ambientes', icon: IconServer, path: '/environments' },
   { label: 'Cenários', icon: IconTestPipe, path: '/scenarios' },
+  { label: 'Documentação API', icon: IconBook, path: '/api-docs' },
 ];
 
 export function AppLayout() {
