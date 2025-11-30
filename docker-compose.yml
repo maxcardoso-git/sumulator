@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: simulator-postgres
+    environment:
+      POSTGRES_USER: simulator
+      POSTGRES_PASSWORD: simulator_prod_pwd
+      POSTGRES_DB: simulator
+    ports:
+      - "5433:5432"
+    volumes:
+      - simulator_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simulator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: simulator-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - simulator_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: simulator-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://simulator:simulator_prod_pwd@postgres:5432/simulator
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: simulator-jwt-secret-production-2024
+      PORT: 4000
+      CORS_ORIGIN: http://72.61.52.70:3002
+    ports:
+      - "4001:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: simulator-frontend
+    environment:
+      VITE_API_URL: http://72.61.52.70:4001/api/v1/simulator
+    ports:
+      - "3002:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  simulator_pgdata:
+  simulator_redisdata:

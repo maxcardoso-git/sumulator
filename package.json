@@ -1,0 +1,34 @@
+{
+  "name": "orchestrator-simulator",
+  "version": "1.0.0",
+  "description": "Aplicação simuladora para teste de fluxos do Orquestrador, Workers, componentes de IA (FSB, ACE, RAG) e integrações externas",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev -w @simulator/backend",
+    "dev:frontend": "npm run dev -w @simulator/frontend",
+    "build": "npm run build -w @simulator/backend && npm run build -w @simulator/frontend",
+    "build:backend": "npm run build -w @simulator/backend",
+    "build:frontend": "npm run build -w @simulator/frontend",
+    "test": "npm run test -w @simulator/backend && npm run test -w @simulator/frontend",
+    "test:backend": "npm run test -w @simulator/backend",
+    "test:frontend": "npm run test -w @simulator/frontend",
+    "lint": "npm run lint -w @simulator/backend && npm run lint -w @simulator/frontend",
+    "db:migrate": "npm run db:migrate -w @simulator/backend",
+    "db:seed": "npm run db:seed -w @simulator/backend",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

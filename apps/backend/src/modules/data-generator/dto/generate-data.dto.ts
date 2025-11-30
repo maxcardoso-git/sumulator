@@ -1,0 +1,70 @@
+import { IsString, IsNumber, IsOptional, IsObject, IsBoolean, IsUUID, IsIn, Min, Max } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class AnomaliesConfig {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  count?: number;
+
+  @ApiPropertyOptional({ example: ['outlier', 'duplicate', 'null_value'] })
+  @IsOptional()
+  @IsString({ each: true })
+  types?: string[];
+}
+
+export class GenerateDataDto {
+  @ApiPropertyOptional({ example: 'uuid-of-environment' })
+  @IsOptional()
+  @IsUUID()
+  environment_id?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-of-scenario' })
+  @IsOptional()
+  @IsUUID()
+  scenario_id?: string;
+
+  @ApiProperty({ example: 'transactions', enum: ['transactions', 'operational_events'] })
+  @IsIn(['transactions', 'operational_events'])
+  target_table: string;
+
+  @ApiProperty({ example: 1000 })
+  @IsNumber()
+  @Min(1)
+  @Max(100000)
+  rows: number;
+
+  @ApiPropertyOptional({
+    example: {
+      amount: { type: 'normal', params: { mean: 250, stdDev: 100 } },
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  distributions?: Record<string, { type: string; params?: Record<string, number> }>;
+
+  @ApiPropertyOptional({
+    example: {
+      customer_channel: 0.7,
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  correlations?: Record<string, number>;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  seasonality?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  anomalies?: AnomaliesConfig;
+}

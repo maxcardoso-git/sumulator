@@ -1,0 +1,374 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["core", "sim_data", "sim_domain", "audit"]
+}
+
+// =====================================================
+// CORE SCHEMA
+// =====================================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String?  @db.VarChar(255)
+  role         String   @default("VIEWER") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  scenarios       Scenario[]
+  formDefinitions FormDefinition[]
+  auditEvents     AuditEvent[]
+
+  @@map("users")
+  @@schema("core")
+}
+
+model Environment {
+  id                  String   @id @default(uuid()) @db.Uuid
+  name                String   @db.VarChar(100)
+  code                String   @unique @db.VarChar(50)
+  orchestratorBaseUrl String?  @map("orchestrator_base_url") @db.VarChar(500)
+  workerBaseUrl       String?  @map("worker_base_url") @db.VarChar(500)
+  authType            String?  @map("auth_type") @db.VarChar(50)
+  authConfig          Json     @default("{}") @map("auth_config")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  scenarios         Scenario[]
+  chatSessions      ChatSession[]
+  formDefinitions   FormDefinition[]
+  sqlTables         SqlTable[]
+  apiEndpoints      ApiEndpoint[]
+  orchestratorCalls OrchestratorCall[]
+  executions        Execution[]
+
+  @@map("environments")
+  @@schema("core")
+}
+
+model Scenario {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @map("environment_id") @db.Uuid
+  name          String   @db.VarChar(200)
+  code          String?  @db.VarChar(100)
+  description   String?  @db.Text
+  tags          String[] @db.Text
+  config        Json     @default("{}")
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  environment       Environment        @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  creator           User?              @relation(fields: [createdBy], references: [id])
+  chatSessions      ChatSession[]
+  apiEndpoints      ApiEndpoint[]
+  orchestratorCalls OrchestratorCall[]
+  executions        Execution[]
+
+  @@map("scenarios")
+  @@schema("core")
+}
+
+// =====================================================
+// SIM_DATA SCHEMA
+// =====================================================
+
+model ChatSession {
+  id                String   @id @default(uuid()) @db.Uuid
+  environmentId     String   @map("environment_id") @db.Uuid
+  scenarioId        String?  @map("scenario_id") @db.Uuid
+  externalSessionId String?  @map("external_session_id") @db.VarChar(255)
+  status            String   @default("active") @db.VarChar(50)
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  environment     Environment      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  scenario        Scenario?        @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  messages        ChatMessage[]
+  formSubmissions FormSubmission[]
+
+  @@map("chat_sessions")
+  @@schema("sim_data")
+}
+
+model ChatMessage {
+  id                String   @id @default(uuid()) @db.Uuid
+  sessionId         String   @map("session_id") @db.Uuid
+  direction         String   @db.VarChar(10) // 'inbound' or 'outbound'
+  type              String   @default("text") @db.VarChar(50)
+  content           String?  @db.Text
+  payload           Json     @default("{}")
+  correlationId     String?  @map("correlation_id") @db.VarChar(255)
+  orchestratorRunId String?  @map("orchestrator_run_id") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("chat_messages")
+  @@schema("sim_data")
+}
+
+model FormDefinition {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @map("environment_id") @db.Uuid
+  name          String   @db.VarChar(200)
+  code          String   @unique @db.VarChar(100)
+  schema        Json     @default("{}")
+  uiSchema      Json     @default("{}") @map("ui_schema")
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  environment Environment      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  creator     User?            @relation(fields: [createdBy], references: [id])
+  submissions FormSubmission[]
+
+  @@map("form_definitions")
+  @@schema("sim_data")
+}
+
+model FormSubmission {
+  id                        String   @id @default(uuid()) @db.Uuid
+  formId                    String   @map("form_id") @db.Uuid
+  sessionId                 String?  @map("session_id") @db.Uuid
+  data                      Json     @default("{}")
+  status                    String   @default("submitted") @db.VarChar(50)
+  errors                    Json     @default("[]")
+  orchestratorCorrelationId String?  @map("orchestrator_correlation_id") @db.VarChar(255)
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  form    FormDefinition @relation(fields: [formId], references: [id], onDelete: Cascade)
+  session ChatSession?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@map("form_submissions")
+  @@schema("sim_data")
+}
+
+model SqlTable {
+  id               String   @id @default(uuid()) @db.Uuid
+  environmentId    String   @map("environment_id") @db.Uuid
+  name             String   @db.VarChar(200)
+  schemaDefinition Json     @map("schema_definition")
+  seedConfig       Json     @default("{}") @map("seed_config")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@map("sql_tables")
+  @@schema("sim_data")
+}
+
+model ApiEndpoint {
+  id               String   @id @default(uuid()) @db.Uuid
+  environmentId    String   @map("environment_id") @db.Uuid
+  scenarioId       String?  @map("scenario_id") @db.Uuid
+  method           String   @db.VarChar(10)
+  path             String   @db.VarChar(500)
+  responseTemplate Json     @default("{}") @map("response_template")
+  statusCode       Int      @default(200) @map("status_code")
+  latencyMs        Int      @default(0) @map("latency_ms")
+  errorRate        Decimal  @default(0) @map("error_rate") @db.Decimal(5, 2)
+  script           String?  @db.Text
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  environment Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  scenario    Scenario?    @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  callLogs    ApiCallLog[]
+
+  @@map("api_endpoints")
+  @@schema("sim_data")
+}
+
+model ApiCallLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  endpointId      String   @map("endpoint_id") @db.Uuid
+  requestMethod   String?  @map("request_method") @db.VarChar(10)
+  requestPath     String?  @map("request_path") @db.VarChar(500)
+  requestHeaders  Json?    @map("request_headers")
+  requestBody     Json?    @map("request_body")
+  responseStatus  Int?     @map("response_status")
+  responseBody    Json?    @map("response_body")
+  latencyMs       Int?     @map("latency_ms")
+  errorInjected   Boolean  @default(false) @map("error_injected")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  endpoint ApiEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@map("api_call_logs")
+  @@schema("sim_data")
+}
+
+model Transaction {
+  id            String   @id @default(uuid()) @db.Uuid
+  ts            DateTime @default(now()) @db.Timestamptz
+  type          String?  @db.VarChar(50)
+  amount        Decimal? @db.Decimal(18, 2)
+  paymentMethod String?  @map("payment_method") @db.VarChar(50)
+  customerId    String?  @map("customer_id") @db.Uuid
+  contractId    String?  @map("contract_id") @db.Uuid
+  status        String?  @db.VarChar(50)
+  channel       String?  @db.VarChar(50)
+  metadata      Json     @default("{}")
+
+  @@index([ts])
+  @@index([customerId])
+  @@map("transactions")
+  @@schema("sim_data")
+}
+
+model OperationalEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  operation   String?  @db.VarChar(100)
+  ts          DateTime @default(now()) @db.Timestamptz
+  durationSec Int?     @map("duration_sec")
+  agent       String?  @db.VarChar(100)
+  channel     String?  @db.VarChar(50)
+  slaHit      Boolean? @map("sla_hit")
+  result      String?  @db.VarChar(50)
+  metadata    Json     @default("{}")
+
+  @@index([ts])
+  @@map("operational_events")
+  @@schema("sim_data")
+}
+
+// =====================================================
+// SIM_DOMAIN SCHEMA
+// =====================================================
+
+model DomainConcept {
+  id          String   @id @default(uuid()) @db.Uuid
+  domain      String   @db.VarChar(100)
+  code        String   @db.VarChar(100)
+  label       String?  @db.VarChar(200)
+  description String?  @db.Text
+  attributes  Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  synonyms          Synonym[]
+  relationsFrom     DomainRelation[] @relation("from_concept")
+  relationsTo       DomainRelation[] @relation("to_concept")
+
+  @@unique([domain, code])
+  @@index([domain])
+  @@map("domain_concepts")
+  @@schema("sim_domain")
+}
+
+model DomainRelation {
+  id            String   @id @default(uuid()) @db.Uuid
+  fromConceptId String   @map("from_concept_id") @db.Uuid
+  toConceptId   String   @map("to_concept_id") @db.Uuid
+  relationType  String   @map("relation_type") @db.VarChar(100)
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  fromConcept DomainConcept @relation("from_concept", fields: [fromConceptId], references: [id], onDelete: Cascade)
+  toConcept   DomainConcept @relation("to_concept", fields: [toConceptId], references: [id], onDelete: Cascade)
+
+  @@map("domain_relations")
+  @@schema("sim_domain")
+}
+
+model Synonym {
+  id        String   @id @default(uuid()) @db.Uuid
+  conceptId String   @map("concept_id") @db.Uuid
+  term      String   @db.VarChar(200)
+  language  String   @default("pt-BR") @db.VarChar(10)
+  weight    Decimal  @default(1.0) @db.Decimal(5, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  concept DomainConcept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@map("synonyms")
+  @@schema("sim_domain")
+}
+
+model ContextTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  domain    String   @db.VarChar(100)
+  name      String   @db.VarChar(200)
+  template  String   @db.Text
+  variables Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("context_templates")
+  @@schema("sim_domain")
+}
+
+// =====================================================
+// AUDIT SCHEMA
+// =====================================================
+
+model OrchestratorCall {
+  id              String   @id @default(uuid()) @db.Uuid
+  environmentId   String?  @map("environment_id") @db.Uuid
+  scenarioId      String?  @map("scenario_id") @db.Uuid
+  sessionId       String?  @map("session_id") @db.Uuid
+  direction       String   @db.VarChar(10) // 'outbound' or 'inbound'
+  endpoint        String?  @db.VarChar(500)
+  method          String?  @db.VarChar(10)
+  requestHeaders  Json?    @map("request_headers")
+  requestBody     Json?    @map("request_body")
+  responseStatus  Int?     @map("response_status")
+  responseBody    Json?    @map("response_body")
+  latencyMs       Int?     @map("latency_ms")
+  errorFlag       Boolean  @default(false) @map("error_flag")
+  correlationId   String?  @map("correlation_id") @db.VarChar(255)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  environment Environment? @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+  scenario    Scenario?    @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([environmentId])
+  @@index([correlationId])
+  @@map("orchestrator_calls")
+  @@schema("audit")
+}
+
+model Execution {
+  id                  String    @id @default(uuid()) @db.Uuid
+  orchestratorRunId   String?   @map("orchestrator_run_id") @db.VarChar(255)
+  environmentId       String?   @map("environment_id") @db.Uuid
+  scenarioId          String?   @map("scenario_id") @db.Uuid
+  sessionId           String?   @map("session_id") @db.Uuid
+  status              String    @default("pending") @db.VarChar(50)
+  startedAt           DateTime? @map("started_at") @db.Timestamptz
+  finishedAt          DateTime? @map("finished_at") @db.Timestamptz
+  metrics             Json      @default("{}")
+  decisionLoopPhases  Json      @default("{}") @map("decision_loop_phases")
+
+  environment Environment? @relation(fields: [environmentId], references: [id], onDelete: SetNull)
+  scenario    Scenario?    @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([orchestratorRunId])
+  @@map("executions")
+  @@schema("audit")
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventType    String   @map("event_type") @db.VarChar(100)
+  actorId      String?  @map("actor_id") @db.Uuid
+  resourceType String?  @map("resource_type") @db.VarChar(100)
+  resourceId   String?  @map("resource_id") @db.Uuid
+  details      Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("events")
+  @@schema("audit")
+}
