@@ -1,8 +1,8 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Delete, Body, Query, UseGuards, Get } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { DataGeneratorService } from './data-generator.service';
-import { GenerateDataDto } from './dto/generate-data.dto';
+import { GenerateDataDto, DeleteDataDto } from './dto/generate-data.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 
@@ -26,5 +26,20 @@ export class DataGeneratorController {
     return {
       error: 'Unsupported target table. Use "transactions" or "operational_events".',
     };
+  }
+
+  @Delete('clear')
+  @Roles('ADMIN', 'DEV')
+  @ApiOperation({ summary: 'Apagar dados gerados pelo simulador' })
+  async clear(@Body() dto: DeleteDataDto) {
+    return this.dataGeneratorService.clearData(dto);
+  }
+
+  @Get('stats')
+  @Roles('ADMIN', 'DEV', 'QA')
+  @ApiOperation({ summary: 'Obter estatísticas dos dados gerados' })
+  @ApiQuery({ name: 'target_table', required: false, enum: ['transactions', 'operational_events'] })
+  async stats(@Query('target_table') targetTable?: string) {
+    return this.dataGeneratorService.getStats(targetTable);
   }
 }

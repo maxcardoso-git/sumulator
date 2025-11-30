@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { GenerateDataDto } from './dto/generate-data.dto';
+import { GenerateDataDto, DeleteDataDto } from './dto/generate-data.dto';
 
 interface Distribution {
   type: string;
@@ -214,5 +214,78 @@ export class DataGeneratorService {
         anomaly_injected: anomalyType,
       };
     }
+  }
+
+  async clearData(dto: DeleteDataDto) {
+    const results = { transactions_deleted: 0, operational_events_deleted: 0 };
+
+    const buildWhere = (onlySimulator?: boolean, fromDate?: string, toDate?: string) => {
+      const where: Prisma.TransactionWhereInput = {};
+
+      if (onlySimulator) {
+        where.metadata = {
+          path: ['source'],
+          equals: 'simulator',
+        };
+      }
+
+      if (fromDate || toDate) {
+        where.ts = {};
+        if (fromDate) {
+          where.ts.gte = new Date(fromDate);
+        }
+        if (toDate) {
+          where.ts.lte = new Date(toDate);
+        }
+      }
+
+      return where;
+    };
+
+    if (dto.target_table === 'transactions' || dto.target_table === 'all') {
+      const where = buildWhere(dto.only_simulator_data, dto.from_date, dto.to_date);
+      const result = await this.prisma.transaction.deleteMany({ where });
+      results.transactions_deleted = result.count;
+    }
+
+    if (dto.target_table === 'operational_events' || dto.target_table === 'all') {
+      const where = buildWhere(dto.only_simulator_data, dto.from_date, dto.to_date) as Prisma.OperationalEventWhereInput;
+      const result = await this.prisma.operationalEvent.deleteMany({ where });
+      results.operational_events_deleted = result.count;
+    }
+
+    return {
+      success: true,
+      deleted: results,
+    };
+  }
+
+  async getStats(targetTable?: string) {
+    const stats: Record<string, unknown> = {};
+
+    if (!targetTable || targetTable === 'transactions') {
+      const transactionCount = await this.prisma.transaction.count();
+      const simulatorTransactions = await this.prisma.transaction.count({
+        where: {
+          metadata: {
+            path: ['source'],
+            equals: 'simulator',
+          },
+        },
+      });
+      stats.transactions = {
+        total: transactionCount,
+        simulator_generated: simulatorTransactions,
+      };
+    }
+
+    if (!targetTable || targetTable === 'operational_events') {
+      const eventCount = await this.prisma.operationalEvent.count();
+      stats.operational_events = {
+        total: eventCount,
+      };
+    }
+
+    return stats;
   }
 }

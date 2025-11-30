@@ -1,5 +1,26 @@
-import { IsString, IsNumber, IsOptional, IsObject, IsBoolean, IsUUID, IsIn, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, IsBoolean, IsUUID, IsIn, Min, Max, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class DeleteDataDto {
+  @ApiProperty({ example: 'transactions', enum: ['transactions', 'operational_events', 'all'] })
+  @IsIn(['transactions', 'operational_events', 'all'])
+  target_table: string;
+
+  @ApiPropertyOptional({ description: 'Apagar apenas dados gerados pelo simulador' })
+  @IsOptional()
+  @IsBoolean()
+  only_simulator_data?: boolean;
+
+  @ApiPropertyOptional({ description: 'Data inicial para filtrar exclusão' })
+  @IsOptional()
+  @IsDateString()
+  from_date?: string;
+
+  @ApiPropertyOptional({ description: 'Data final para filtrar exclusão' })
+  @IsOptional()
+  @IsDateString()
+  to_date?: string;
+}
 
 class AnomaliesConfig {
   @ApiPropertyOptional()

@@ -56,8 +56,12 @@ export const api = {
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  delete: <T>(endpoint: string, options?: RequestOptions) =>
-    request<T>(endpoint, { ...options, method: 'DELETE' }),
+  delete: <T>(endpoint: string, data?: unknown, options?: RequestOptions) =>
+    request<T>(endpoint, {
+      ...options,
+      method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
 };
 
 // Auth API
@@ -112,6 +116,9 @@ export const formsApi = {
 // Data Generator API
 export const dataGeneratorApi = {
   run: (data: GenerateDataInput) => api.post<GenerateDataResult>('/data-generator/run', data),
+  clear: (data: DeleteDataInput) => api.delete<DeleteDataResult>('/data-generator/clear', data),
+  getStats: (targetTable?: string) =>
+    api.get<DataGeneratorStats>(`/data-generator/stats${targetTable ? `?target_table=${targetTable}` : ''}`),
 };
 
 // Semantic Domain API
@@ -383,4 +390,29 @@ export interface OrchestratorCall {
   errorFlag: boolean;
   correlationId: string | null;
   createdAt: string;
+}
+
+export interface DeleteDataInput {
+  target_table: 'transactions' | 'operational_events' | 'all';
+  only_simulator_data?: boolean;
+  from_date?: string;
+  to_date?: string;
+}
+
+export interface DeleteDataResult {
+  success: boolean;
+  deleted: {
+    transactions_deleted: number;
+    operational_events_deleted: number;
+  };
+}
+
+export interface DataGeneratorStats {
+  transactions?: {
+    total: number;
+    simulator_generated: number;
+  };
+  operational_events?: {
+    total: number;
+  };
 }
