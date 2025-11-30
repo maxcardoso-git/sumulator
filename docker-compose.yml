@@ -59,6 +59,9 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        GIT_COMMIT_HASH: ${GIT_COMMIT_HASH:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-}
     container_name: simulator-frontend
     environment:
       VITE_API_URL: http://72.61.52.70:4001/api/v1/simulator

@@ -1,6 +1,10 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Build arguments for version info
+ARG GIT_COMMIT_HASH=unknown
+ARG BUILD_DATE
+
 WORKDIR /app
 
 # Copy package files
@@ -12,6 +16,10 @@ RUN npm install
 
 # Copy source
 COPY apps/frontend ./apps/frontend
+
+# Set environment variables for Vite build
+ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
+ENV VITE_BUILD_DATE=$BUILD_DATE
 
 # Build
 WORKDIR /app/apps/frontend
