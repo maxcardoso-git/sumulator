@@ -10,7 +10,14 @@ import {
   Menu,
   UnstyledButton,
   rem,
+  Tooltip,
+  Badge,
+  Stack,
 } from '@mantine/core';
+
+// Build info - injected at build time via Vite
+const BUILD_VERSION = import.meta.env.VITE_GIT_COMMIT_HASH || 'dev';
+const BUILD_DATE = import.meta.env.VITE_BUILD_DATE || new Date().toISOString();
 import {
   IconDashboard,
   IconMessage,
@@ -98,19 +105,37 @@ export function AppLayout() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            label={item.label}
-            leftSection={<item.icon size={18} />}
-            active={location.pathname === item.path}
-            onClick={() => {
-              navigate(item.path);
-              setOpened(false);
-            }}
-            mb={4}
-          />
-        ))}
+        <Stack justify="space-between" h="100%">
+          <div>
+            {navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                label={item.label}
+                leftSection={<item.icon size={18} />}
+                active={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  setOpened(false);
+                }}
+                mb={4}
+              />
+            ))}
+          </div>
+          <Tooltip
+            label={`Build: ${BUILD_DATE}`}
+            position="right"
+            withArrow
+          >
+            <Badge
+              variant="light"
+              color="gray"
+              size="sm"
+              style={{ cursor: 'help' }}
+            >
+              v{BUILD_VERSION.substring(0, 7)}
+            </Badge>
+          </Tooltip>
+        </Stack>
       </AppShell.Navbar>
 
       <AppShell.Main>
