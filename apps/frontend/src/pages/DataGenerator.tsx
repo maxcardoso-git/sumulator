@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Title,
   Paper,
@@ -38,7 +38,6 @@ import {
   dataGeneratorApi,
   GenerateDataResult,
   DeleteDataInput,
-  DataGeneratorStats,
 } from '../lib/api';
 
 interface DistributionConfig {
@@ -56,7 +55,6 @@ const defaultDistributions: DistributionConfig[] = [
 ];
 
 export function DataGeneratorPage() {
-  const queryClient = useQueryClient();
   const [result, setResult] = useState<GenerateDataResult | null>(null);
   const [distributions, setDistributions] = useState<DistributionConfig[]>(defaultDistributions);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
