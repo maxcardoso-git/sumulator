@@ -200,12 +200,12 @@ function EndpointCard({ endpoint }: { endpoint: EndpointDoc }) {
           </Box>
         )}
 
-        {endpoint.responseExample && (
+        {endpoint.responseExample !== undefined && (
           <Box>
             <Text fw={500} size="sm" mb="xs">
               Response Example:
             </Text>
-            <CodeBlock code={JSON.stringify(endpoint.responseExample, null, 2)} language="JSON" />
+            <CodeBlock code={JSON.stringify(endpoint.responseExample as object, null, 2)} language="JSON" />
           </Box>
         )}
 
