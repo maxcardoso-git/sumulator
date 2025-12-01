@@ -149,7 +149,7 @@ export function SimulatedApisPage() {
     // Gerar operações a partir dos endpoints
     const operations: ResourceOperation[] = filteredEndpoints.map((ep) => {
       const pathParams = ep.path.match(/\/:([^/]+)/g) || [];
-      const parameters = pathParams.map((param) => ({
+      const parameters: ResourceOperation['parameters'] = pathParams.map((param) => ({
         name: param.replace('/:', ''),
         in: 'path' as const,
         required: true,
