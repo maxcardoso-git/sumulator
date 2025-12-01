@@ -42,7 +42,6 @@ import {
 import {
   dataGeneratorApi,
   formsApi,
-  FormDefinition,
   GenerateDataResult,
   DeleteDataInput,
 } from '../lib/api';
@@ -854,7 +853,7 @@ export function DataGeneratorPage() {
                                   {Object.entries(row)
                                     .filter(([k]) => !k.startsWith('_'))
                                     .slice(0, 6)
-                                    .map(([key, val], colIdx) => (
+                                    .map(([, val], colIdx) => (
                                       <Table.Td key={colIdx}>
                                         <Text size="xs" lineClamp={1}>
                                           {typeof val === 'boolean'

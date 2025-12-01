@@ -49,7 +49,7 @@ export function FormRenderer({ schema, readOnly = true }: FormRendererProps) {
   }
 
   const properties = schema.properties;
-  const requiredFields = schema.required || [];
+  const requiredFields = (schema.required || []) as string[];
 
   const renderField = (name: string, prop: JsonSchemaProperty) => {
     const isRequired = requiredFields.includes(name);
