@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Title,
@@ -21,6 +21,9 @@ import {
   Divider,
   Alert,
   SegmentedControl,
+  Tabs,
+  ScrollArea,
+  Code,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
@@ -33,9 +36,13 @@ import {
   IconAlertTriangle,
   IconDatabase,
   IconChartBar,
+  IconForms,
+  IconRefresh,
 } from '@tabler/icons-react';
 import {
   dataGeneratorApi,
+  formsApi,
+  FormDefinition,
   GenerateDataResult,
   DeleteDataInput,
 } from '../lib/api';
@@ -54,11 +61,131 @@ const defaultDistributions: DistributionConfig[] = [
   { field: 'amount', type: 'normal', mean: 250, stdDev: 100 },
 ];
 
+// Interface para dados gerados por formulário
+interface FormGeneratedData {
+  formId: string;
+  formName: string;
+  formCode: string;
+  data: Record<string, unknown>[];
+  generatedAt: string;
+}
+
+// Função para gerar valor baseado no tipo do campo do schema
+function generateValueForField(
+  fieldName: string,
+  fieldSchema: Record<string, unknown>
+): unknown {
+  const fieldType = fieldSchema.type as string;
+  const format = fieldSchema.format as string | undefined;
+  const enumValues = fieldSchema.enum as string[] | undefined;
+
+  // Se tem enum, escolhe um valor aleatório
+  if (enumValues && enumValues.length > 0) {
+    return enumValues[Math.floor(Math.random() * enumValues.length)];
+  }
+
+  switch (fieldType) {
+    case 'string':
+      if (format === 'email') {
+        const names = ['joao', 'maria', 'pedro', 'ana', 'carlos', 'lucia'];
+        const domains = ['email.com', 'empresa.com.br', 'teste.com'];
+        return `${names[Math.floor(Math.random() * names.length)]}${Math.floor(Math.random() * 1000)}@${domains[Math.floor(Math.random() * domains.length)]}`;
+      }
+      if (format === 'date' || format === 'date-time') {
+        const date = new Date();
+        date.setDate(date.getDate() - Math.floor(Math.random() * 365));
+        return format === 'date'
+          ? date.toISOString().split('T')[0]
+          : date.toISOString();
+      }
+      // Gera texto baseado no nome do campo
+      if (fieldName.toLowerCase().includes('nome') || fieldName.toLowerCase().includes('name')) {
+        const names = ['João Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa', 'Carlos Pereira', 'Lucia Ferreira'];
+        return names[Math.floor(Math.random() * names.length)];
+      }
+      if (fieldName.toLowerCase().includes('descricao') || fieldName.toLowerCase().includes('description')) {
+        const descriptions = [
+          'Descrição detalhada do item solicitado',
+          'Solicitação urgente para análise',
+          'Necessita atenção especial',
+          'Item de rotina para processamento',
+        ];
+        return descriptions[Math.floor(Math.random() * descriptions.length)];
+      }
+      if (fieldName.toLowerCase().includes('titulo') || fieldName.toLowerCase().includes('title')) {
+        const titles = [
+          'Solicitação #' + Math.floor(Math.random() * 10000),
+          'Chamado Urgente',
+          'Requisição de Serviço',
+          'Pedido de Suporte',
+        ];
+        return titles[Math.floor(Math.random() * titles.length)];
+      }
+      if (fieldName.toLowerCase().includes('documento') || fieldName.toLowerCase().includes('cpf') || fieldName.toLowerCase().includes('cnpj')) {
+        // Gera CPF fake
+        return `${Math.floor(Math.random() * 900 + 100)}.${Math.floor(Math.random() * 900 + 100)}.${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 90 + 10)}`;
+      }
+      return `Valor ${fieldName} #${Math.floor(Math.random() * 1000)}`;
+
+    case 'number':
+      const min = (fieldSchema.minimum as number) ?? 0;
+      const max = (fieldSchema.maximum as number) ?? 10000;
+      return Math.round((Math.random() * (max - min) + min) * 100) / 100;
+
+    case 'integer':
+      const intMin = (fieldSchema.minimum as number) ?? 0;
+      const intMax = (fieldSchema.maximum as number) ?? 100;
+      return Math.floor(Math.random() * (intMax - intMin) + intMin);
+
+    case 'boolean':
+      return Math.random() > 0.5;
+
+    default:
+      return `Valor ${fieldName}`;
+  }
+}
+
+// Função para gerar dados baseados no schema do formulário
+function generateDataFromSchema(
+  schema: Record<string, unknown>,
+  count: number
+): Record<string, unknown>[] {
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  if (!properties) return [];
+
+  const data: Record<string, unknown>[] = [];
+  for (let i = 0; i < count; i++) {
+    const row: Record<string, unknown> = {};
+    for (const [fieldName, fieldSchema] of Object.entries(properties)) {
+      row[fieldName] = generateValueForField(fieldName, fieldSchema);
+    }
+    row._generated_at = new Date().toISOString();
+    row._row_index = i + 1;
+    data.push(row);
+  }
+  return data;
+}
+
 export function DataGeneratorPage() {
   const [result, setResult] = useState<GenerateDataResult | null>(null);
   const [distributions, setDistributions] = useState<DistributionConfig[]>(defaultDistributions);
   const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
   const [previewFilter, setPreviewFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string | null>('tables');
+
+  // Estados para geração por formulário
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [formRowCount, setFormRowCount] = useState<number>(10);
+  const [formGeneratedData, setFormGeneratedData] = useState<FormGeneratedData[]>([]);
+
+  const { data: forms } = useQuery({
+    queryKey: ['forms'],
+    queryFn: () => formsApi.list(),
+  });
+
+  const selectedForm = useMemo(() => {
+    return forms?.find((f) => f.id === selectedFormId);
+  }, [forms, selectedFormId]);
 
   const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ['data-generator-stats'],
@@ -203,6 +330,46 @@ export function DataGeneratorPage() {
     return true;
   });
 
+  // Função para gerar dados por formulário
+  const handleGenerateFormData = () => {
+    if (!selectedForm) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Selecione um formulário',
+        color: 'red',
+      });
+      return;
+    }
+
+    const generatedData = generateDataFromSchema(selectedForm.schema, formRowCount);
+
+    const newFormData: FormGeneratedData = {
+      formId: selectedForm.id,
+      formName: selectedForm.name,
+      formCode: selectedForm.code,
+      data: generatedData,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Adiciona ao início da lista (mais recente primeiro)
+    setFormGeneratedData((prev) => [newFormData, ...prev]);
+
+    notifications.show({
+      title: 'Dados Gerados',
+      message: `${formRowCount} registros gerados para o formulário "${selectedForm.name}"`,
+      color: 'green',
+    });
+  };
+
+  // Limpar dados gerados por formulário
+  const handleClearFormData = (formId?: string) => {
+    if (formId) {
+      setFormGeneratedData((prev) => prev.filter((f) => f.formId !== formId));
+    } else {
+      setFormGeneratedData([]);
+    }
+  };
+
   return (
     <Stack>
       <Group justify="space-between">
@@ -253,10 +420,38 @@ export function DataGeneratorPage() {
               <IconChartBar size={32} color="var(--mantine-color-green-6)" />
             </Group>
           </Card>
+
+          <Card withBorder padding="lg">
+            <Group justify="space-between">
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                  Dados de Formulários
+                </Text>
+                <Text size="xl" fw={700}>
+                  {formGeneratedData.reduce((sum, f) => sum + f.data.length, 0)}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {formGeneratedData.length} lotes gerados
+                </Text>
+              </div>
+              <IconForms size={32} color="var(--mantine-color-violet-6)" />
+            </Group>
+          </Card>
         </SimpleGrid>
       )}
 
-      <Paper withBorder p="md">
+      <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs.List>
+          <Tabs.Tab value="tables" leftSection={<IconDatabase size={16} />}>
+            Tabelas (Transactions/Events)
+          </Tabs.Tab>
+          <Tabs.Tab value="forms" leftSection={<IconForms size={16} />}>
+            Formulários
+          </Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="tables" pt="md">
+          <Paper withBorder p="md">
         <form onSubmit={form.onSubmit(handleGenerate)}>
           <Stack>
             <Group grow>
@@ -529,6 +724,214 @@ export function DataGeneratorPage() {
           </Stack>
         </Paper>
       )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="forms" pt="md">
+          <Stack>
+            {/* Form Generator */}
+            <Paper withBorder p="md">
+              <Stack>
+                <Group justify="space-between">
+                  <Text fw={600}>Gerar Dados por Formulário</Text>
+                  {formGeneratedData.length > 0 && (
+                    <Button
+                      color="red"
+                      variant="subtle"
+                      size="xs"
+                      leftSection={<IconTrash size={14} />}
+                      onClick={() => handleClearFormData()}
+                    >
+                      Limpar Todos
+                    </Button>
+                  )}
+                </Group>
+
+                <Group grow align="flex-end">
+                  <Select
+                    label="Formulário"
+                    placeholder="Selecione um formulário"
+                    data={forms?.map((f) => ({
+                      value: f.id,
+                      label: `${f.name} (${f.code})`,
+                    })) || []}
+                    value={selectedFormId}
+                    onChange={setSelectedFormId}
+                    searchable
+                  />
+                  <NumberInput
+                    label="Quantidade de Registros"
+                    min={1}
+                    max={1000}
+                    value={formRowCount}
+                    onChange={(value) => setFormRowCount(typeof value === 'number' ? value : 10)}
+                  />
+                  <Button
+                    leftSection={<IconPlayerPlay size={16} />}
+                    onClick={handleGenerateFormData}
+                    disabled={!selectedFormId}
+                  >
+                    Gerar Dados
+                  </Button>
+                </Group>
+
+                {selectedForm && (
+                  <Paper withBorder p="sm" bg="gray.0">
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" fw={600}>
+                        Schema do Formulário: {selectedForm.name}
+                      </Text>
+                      <Badge variant="light">{selectedForm.code}</Badge>
+                    </Group>
+                    <ScrollArea h={150}>
+                      <Code block>{JSON.stringify(selectedForm.schema, null, 2)}</Code>
+                    </ScrollArea>
+                  </Paper>
+                )}
+              </Stack>
+            </Paper>
+
+            {/* Generated Data List */}
+            {formGeneratedData.length > 0 && (
+              <Accordion variant="separated">
+                {formGeneratedData.map((formData, idx) => (
+                  <Accordion.Item key={`${formData.formId}-${idx}`} value={`${formData.formId}-${idx}`}>
+                    <Accordion.Control>
+                      <Group justify="space-between" wrap="nowrap" style={{ flex: 1 }}>
+                        <Group gap="sm">
+                          <IconForms size={20} color="var(--mantine-color-violet-6)" />
+                          <div>
+                            <Text fw={500}>{formData.formName}</Text>
+                            <Text size="xs" c="dimmed">
+                              {formData.data.length} registros - Gerado em{' '}
+                              {new Date(formData.generatedAt).toLocaleString('pt-BR')}
+                            </Text>
+                          </div>
+                        </Group>
+                        <Badge variant="light">{formData.formCode}</Badge>
+                      </Group>
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                      <Stack>
+                        <Group justify="flex-end">
+                          <Button
+                            color="red"
+                            variant="subtle"
+                            size="xs"
+                            leftSection={<IconTrash size={14} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFormGeneratedData((prev) =>
+                                prev.filter((_, i) => i !== idx)
+                              );
+                            }}
+                          >
+                            Remover Lote
+                          </Button>
+                        </Group>
+
+                        <ScrollArea>
+                          <Table striped highlightOnHover withTableBorder>
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>#</Table.Th>
+                                {formData.data[0] &&
+                                  Object.keys(formData.data[0])
+                                    .filter((k) => !k.startsWith('_'))
+                                    .slice(0, 6)
+                                    .map((key) => (
+                                      <Table.Th key={key}>{key}</Table.Th>
+                                    ))}
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {formData.data.slice(0, 20).map((row, rowIdx) => (
+                                <Table.Tr key={rowIdx}>
+                                  <Table.Td>
+                                    <Text size="xs" c="dimmed">
+                                      {rowIdx + 1}
+                                    </Text>
+                                  </Table.Td>
+                                  {Object.entries(row)
+                                    .filter(([k]) => !k.startsWith('_'))
+                                    .slice(0, 6)
+                                    .map(([key, val], colIdx) => (
+                                      <Table.Td key={colIdx}>
+                                        <Text size="xs" lineClamp={1}>
+                                          {typeof val === 'boolean'
+                                            ? val
+                                              ? 'Sim'
+                                              : 'Não'
+                                            : typeof val === 'object'
+                                              ? JSON.stringify(val)
+                                              : String(val)}
+                                        </Text>
+                                      </Table.Td>
+                                    ))}
+                                </Table.Tr>
+                              ))}
+                            </Table.Tbody>
+                          </Table>
+                        </ScrollArea>
+
+                        {formData.data.length > 20 && (
+                          <Text size="xs" c="dimmed" ta="center">
+                            Mostrando 20 de {formData.data.length} registros
+                          </Text>
+                        )}
+
+                        <Divider />
+
+                        <Group justify="space-between">
+                          <Text size="sm" fw={500}>
+                            JSON dos Dados Gerados:
+                          </Text>
+                          <Button
+                            variant="subtle"
+                            size="xs"
+                            leftSection={<IconRefresh size={14} />}
+                            onClick={() => {
+                              const form = forms?.find((f) => f.id === formData.formId);
+                              if (form) {
+                                const newData = generateDataFromSchema(form.schema, formData.data.length);
+                                setFormGeneratedData((prev) =>
+                                  prev.map((item, i) =>
+                                    i === idx
+                                      ? { ...item, data: newData, generatedAt: new Date().toISOString() }
+                                      : item
+                                  )
+                                );
+                                notifications.show({
+                                  title: 'Dados Regenerados',
+                                  message: `Novos dados gerados para "${formData.formName}"`,
+                                  color: 'blue',
+                                });
+                              }
+                            }}
+                          >
+                            Regenerar
+                          </Button>
+                        </Group>
+                        <ScrollArea h={200}>
+                          <Code block>{JSON.stringify(formData.data, null, 2)}</Code>
+                        </ScrollArea>
+                      </Stack>
+                    </Accordion.Panel>
+                  </Accordion.Item>
+                ))}
+              </Accordion>
+            )}
+
+            {formGeneratedData.length === 0 && (
+              <Paper withBorder p="xl">
+                <Text c="dimmed" ta="center">
+                  Nenhum dado de formulário gerado ainda. Selecione um formulário acima e clique em
+                  "Gerar Dados".
+                </Text>
+              </Paper>
+            )}
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
 
       {/* Delete Modal */}
       <Modal opened={deleteModalOpened} onClose={closeDeleteModal} title="Apagar Dados Gerados">

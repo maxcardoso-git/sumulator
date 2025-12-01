@@ -24,12 +24,14 @@ import { notifications } from '@mantine/notifications';
 import { IconPlus, IconTrash, IconEye, IconCode, IconForms, IconCopy, IconCheck } from '@tabler/icons-react';
 import { formsApi, environmentsApi, FormDefinition } from '../lib/api';
 import { FormBuilder, FormField, fieldsToJsonSchema, fieldsToUiSchema } from '../components/FormBuilder';
+import { FormRenderer } from '../components/FormRenderer';
 
 export function FormsPage() {
   const [createModal, setCreateModal] = useState(false);
   const [viewModal, setViewModal] = useState<FormDefinition | null>(null);
   const [builderFields, setBuilderFields] = useState<FormField[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>('builder');
+  const [viewTab, setViewTab] = useState<string | null>('preview');
   const queryClient = useQueryClient();
 
   const { data: environments } = useQuery({
@@ -302,7 +304,7 @@ export function FormsPage() {
       </Modal>
 
       {/* View Modal */}
-      <Modal opened={!!viewModal} onClose={() => setViewModal(null)} title={viewModal?.name} size="lg">
+      <Modal opened={!!viewModal} onClose={() => setViewModal(null)} title={viewModal?.name} size="xl">
         {viewModal && (
           <Stack>
             <Group>
@@ -320,47 +322,70 @@ export function FormsPage() {
               </div>
             </Group>
 
-            <div>
-              <Group justify="space-between" mb="xs">
-                <Text size="sm" fw={600}>
-                  Schema:
-                </Text>
-                <CopyButton value={JSON.stringify(viewModal.schema, null, 2)}>
-                  {({ copied, copy }) => (
-                    <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
-                      <ActionIcon variant="subtle" size="sm" onClick={copy}>
-                        {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </CopyButton>
-              </Group>
-              <ScrollArea h={250}>
-                <Code block>{JSON.stringify(viewModal.schema, null, 2)}</Code>
-              </ScrollArea>
-            </div>
+            <Tabs value={viewTab} onChange={setViewTab}>
+              <Tabs.List>
+                <Tabs.Tab value="preview" leftSection={<IconForms size={16} />}>
+                  Visualização
+                </Tabs.Tab>
+                <Tabs.Tab value="schema" leftSection={<IconCode size={16} />}>
+                  JSON Schema
+                </Tabs.Tab>
+              </Tabs.List>
 
-            {viewModal.uiSchema && Object.keys(viewModal.uiSchema as object).length > 0 && (
-              <div>
-                <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={600}>
-                    UI Schema:
-                  </Text>
-                  <CopyButton value={JSON.stringify(viewModal.uiSchema, null, 2)}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
-                        <ActionIcon variant="subtle" size="sm" onClick={copy}>
-                          {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-                <ScrollArea h={150}>
-                  <Code block>{JSON.stringify(viewModal.uiSchema, null, 2)}</Code>
-                </ScrollArea>
-              </div>
-            )}
+              <Tabs.Panel value="preview" pt="md">
+                <FormRenderer
+                  schema={viewModal.schema as Record<string, unknown>}
+                  uiSchema={viewModal.uiSchema as Record<string, unknown>}
+                  readOnly
+                />
+              </Tabs.Panel>
+
+              <Tabs.Panel value="schema" pt="md">
+                <Stack>
+                  <div>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" fw={600}>
+                        Schema:
+                      </Text>
+                      <CopyButton value={JSON.stringify(viewModal.schema, null, 2)}>
+                        {({ copied, copy }) => (
+                          <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
+                            <ActionIcon variant="subtle" size="sm" onClick={copy}>
+                              {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </CopyButton>
+                    </Group>
+                    <ScrollArea h={200}>
+                      <Code block>{JSON.stringify(viewModal.schema, null, 2)}</Code>
+                    </ScrollArea>
+                  </div>
+
+                  {viewModal.uiSchema && Object.keys(viewModal.uiSchema as object).length > 0 && (
+                    <div>
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm" fw={600}>
+                          UI Schema:
+                        </Text>
+                        <CopyButton value={JSON.stringify(viewModal.uiSchema, null, 2)}>
+                          {({ copied, copy }) => (
+                            <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
+                              <ActionIcon variant="subtle" size="sm" onClick={copy}>
+                                {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
+                        </CopyButton>
+                      </Group>
+                      <ScrollArea h={150}>
+                        <Code block>{JSON.stringify(viewModal.uiSchema, null, 2)}</Code>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </Stack>
+              </Tabs.Panel>
+            </Tabs>
           </Stack>
         )}
       </Modal>
