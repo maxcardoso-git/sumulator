@@ -48,6 +48,7 @@ model Environment {
   apiEndpoints      ApiEndpoint[]
   orchestratorCalls OrchestratorCall[]
   executions        Execution[]
+  externalApis      ExternalApi[]
 
   @@map("environments")
   @@schema("core")
@@ -129,9 +130,10 @@ model FormDefinition {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  environment Environment      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
-  creator     User?            @relation(fields: [createdBy], references: [id])
-  submissions FormSubmission[]
+  environment  Environment      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  creator      User?            @relation(fields: [createdBy], references: [id])
+  submissions  FormSubmission[]
+  externalApis ExternalApi[]
 
   @@map("form_definitions")
   @@schema("sim_data")
@@ -371,4 +373,36 @@ model AuditEvent {
 
   @@map("events")
   @@schema("audit")
+}
+
+// =====================================================
+// EXTERNAL APIs (Orquestrador)
+// =====================================================
+
+model ExternalApi {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @map("environment_id") @db.Uuid
+  formId        String?  @map("form_id") @db.Uuid
+  name          String   @db.VarChar(200)
+  code          String   @unique @db.VarChar(100)
+  description   String?  @db.Text
+  baseUrl       String   @map("base_url") @db.VarChar(500)
+  endpoint      String   @db.VarChar(500)
+  method        String   @default("POST") @db.VarChar(10)
+  headers       Json     @default("{}")
+  authType      String?  @map("auth_type") @db.VarChar(50)
+  authConfig    Json     @default("{}") @map("auth_config")
+  requestBody   Json     @default("{}") @map("request_body")
+  timeout       Int      @default(30000)
+  enabled       Boolean  @default(true)
+  lastTestedAt  DateTime? @map("last_tested_at") @db.Timestamptz
+  lastTestStatus String? @map("last_test_status") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  environment Environment     @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  form        FormDefinition? @relation(fields: [formId], references: [id], onDelete: SetNull)
+
+  @@map("external_apis")
+  @@schema("core")
 }

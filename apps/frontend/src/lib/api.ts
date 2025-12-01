@@ -416,3 +416,75 @@ export interface DataGeneratorStats {
     total: number;
   };
 }
+
+// External APIs
+export interface ExternalApi {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  baseUrl: string;
+  endpoint: string;
+  method: string;
+  headers: Record<string, string>;
+  authType: string | null;
+  authConfig: Record<string, unknown>;
+  requestBody: Record<string, unknown>;
+  timeout: number;
+  enabled: boolean;
+  lastTestedAt: string | null;
+  lastTestStatus: string | null;
+  environment: { id: string; name: string; code: string };
+  form: { id: string; name: string; code: string } | null;
+  createdAt: string;
+}
+
+export interface CreateExternalApiInput {
+  environment_id: string;
+  form_id?: string;
+  name: string;
+  code: string;
+  description?: string;
+  base_url: string;
+  endpoint: string;
+  method?: string;
+  headers?: Record<string, string>;
+  auth_type?: string;
+  auth_config?: Record<string, unknown>;
+  request_body?: Record<string, unknown>;
+  timeout?: number;
+  enabled?: boolean;
+}
+
+export interface InvokeExternalApiInput {
+  payload?: Record<string, unknown>;
+  extra_headers?: Record<string, string>;
+}
+
+export interface InvokeExternalApiResult {
+  success: boolean;
+  status: string;
+  latency_ms: number;
+  response: unknown;
+  error: string | null;
+  request: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: unknown;
+  };
+}
+
+export const externalApisApi = {
+  list: (environmentId?: string) =>
+    api.get<ExternalApi[]>(`/external-apis${environmentId ? `?environment_id=${environmentId}` : ''}`),
+  get: (id: string) => api.get<ExternalApi>(`/external-apis/${id}`),
+  getByForm: (formId: string) => api.get<ExternalApi[]>(`/external-apis/by-form/${formId}`),
+  create: (data: CreateExternalApiInput) => api.post<ExternalApi>('/external-apis', data),
+  update: (id: string, data: Partial<CreateExternalApiInput>) =>
+    api.put<ExternalApi>(`/external-apis/${id}`, data),
+  delete: (id: string) => api.delete(`/external-apis/${id}`),
+  invoke: (id: string, data?: InvokeExternalApiInput) =>
+    api.post<InvokeExternalApiResult>(`/external-apis/${id}/invoke`, data || {}),
+  test: (id: string) => api.post<InvokeExternalApiResult>(`/external-apis/${id}/test`),
+};

@@ -32,6 +32,8 @@ import {
   IconServer,
   IconTestPipe,
   IconBook,
+  IconPlugConnected,
+  IconReportAnalytics,
 } from '@tabler/icons-react';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -46,6 +48,8 @@ const navItems = [
   { label: 'Ambientes', icon: IconServer, path: '/environments' },
   { label: 'Cenários', icon: IconTestPipe, path: '/scenarios' },
   { label: 'Documentação API', icon: IconBook, path: '/api-docs' },
+  { label: 'APIs Externas', icon: IconPlugConnected, path: '/external-apis' },
+  { label: 'Analise de Dados', icon: IconReportAnalytics, path: '/data-analysis' },
 ];
 
 export function AppLayout() {

@@ -13,6 +13,7 @@ import { SimulatedApiModule } from './modules/simulated-api/simulated-api.module
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { ObservabilityModule } from './modules/observability/observability.module';
 import { EventsModule } from './modules/events/events.module';
+import { ExternalApisModule } from './modules/external-apis/external-apis.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { EventsModule } from './modules/events/events.module';
     WebhooksModule,
     ObservabilityModule,
     EventsModule,
+    ExternalApisModule,
   ],
 })
 export class AppModule {}
