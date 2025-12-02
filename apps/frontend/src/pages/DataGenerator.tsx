@@ -49,6 +49,7 @@ import {
   formsApi,
   GenerateDataResult,
   DeleteDataInput,
+  BulkSubmitFormResult,
 } from '../lib/api';
 
 interface DistributionConfig {
@@ -252,6 +253,7 @@ export function DataGeneratorPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -441,7 +443,7 @@ export function DataGeneratorPage() {
   ];
 
   // Função para gerar dados por formulário
-  const handleGenerateFormData = () => {
+  const handleGenerateFormData = async () => {
     if (!selectedForm) {
       notifications.show({
         title: 'Erro',
@@ -451,37 +453,52 @@ export function DataGeneratorPage() {
       return;
     }
 
-    // Monta as opcoes de data/hora
-    const dateTimeOptions: DateTimeGenerationOptions = {
-      year: parseInt(selectedYear),
-      month: parseInt(selectedMonth),
-      day: selectedDay ? parseInt(selectedDay) : undefined,
-      time: selectedTime || undefined,
-    };
+    setIsSaving(true);
 
-    const generatedData = generateDataFromSchema(selectedForm.schema, formRowCount, dateTimeOptions);
+    try {
+      // Monta as opcoes de data/hora
+      const dateTimeOptions: DateTimeGenerationOptions = {
+        year: parseInt(selectedYear),
+        month: parseInt(selectedMonth),
+        day: selectedDay ? parseInt(selectedDay) : undefined,
+        time: selectedTime || undefined,
+      };
 
-    const newFormData: FormGeneratedData = {
-      formId: selectedForm.id,
-      formName: selectedForm.name,
-      formCode: selectedForm.code,
-      data: generatedData,
-      generatedAt: new Date().toISOString(),
-    };
+      const generatedData = generateDataFromSchema(selectedForm.schema, formRowCount, dateTimeOptions);
 
-    // Adiciona ao início da lista (mais recente primeiro)
-    setFormGeneratedData((prev) => [newFormData, ...prev]);
+      // Salva os dados no banco de dados via API
+      const result = await formsApi.bulkSubmit(selectedForm.code, { data: generatedData });
 
-    // Monta mensagem descritiva
-    let dateDesc = `${selectedMonth.padStart(2, '0')}/${selectedYear}`;
-    if (selectedDay) dateDesc = `${selectedDay.padStart(2, '0')}/${dateDesc}`;
-    if (selectedTime) dateDesc += ` ${selectedTime}`;
+      const newFormData: FormGeneratedData = {
+        formId: selectedForm.id,
+        formName: selectedForm.name,
+        formCode: selectedForm.code,
+        data: generatedData,
+        generatedAt: new Date().toISOString(),
+      };
 
-    notifications.show({
-      title: 'Dados Gerados',
-      message: `${formRowCount} registros gerados para "${selectedForm.name}" - Periodo: ${dateDesc}`,
-      color: 'green',
-    });
+      // Adiciona ao início da lista (mais recente primeiro)
+      setFormGeneratedData((prev) => [newFormData, ...prev]);
+
+      // Monta mensagem descritiva
+      let dateDesc = `${selectedMonth.padStart(2, '0')}/${selectedYear}`;
+      if (selectedDay) dateDesc = `${selectedDay.padStart(2, '0')}/${dateDesc}`;
+      if (selectedTime) dateDesc += ` ${selectedTime}`;
+
+      notifications.show({
+        title: 'Dados Gerados e Salvos',
+        message: `${result.total_submitted} registros salvos para "${selectedForm.name}" - Periodo: ${dateDesc}`,
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: 'Erro ao salvar dados',
+        message: error instanceof Error ? error.message : 'Erro desconhecido ao salvar dados',
+        color: 'red',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Limpar dados gerados por formulário
@@ -891,9 +908,10 @@ export function DataGeneratorPage() {
                   <Button
                     leftSection={<IconPlayerPlay size={16} />}
                     onClick={handleGenerateFormData}
-                    disabled={!selectedFormId}
+                    disabled={!selectedFormId || isSaving}
+                    loading={isSaving}
                   >
-                    Gerar Dados
+                    {isSaving ? 'Salvando...' : 'Gerar e Salvar Dados'}
                   </Button>
                 </Group>
 

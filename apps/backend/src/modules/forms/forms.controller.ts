@@ -4,7 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { FormsService } from './forms.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
-import { SubmitFormDto } from './dto/submit-form.dto';
+import { SubmitFormDto, BulkSubmitFormDto } from './dto/submit-form.dto';
 import { CurrentUser, CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -53,6 +53,13 @@ export class FormsController {
   @ApiOperation({ summary: 'Submeter dados de formulário' })
   async submit(@Param('formCode') formCode: string, @Body() dto: SubmitFormDto) {
     return this.formsService.submit(formCode, dto);
+  }
+
+  @Post(':formCode/bulk-submit')
+  @Roles('ADMIN', 'DEV', 'QA')
+  @ApiOperation({ summary: 'Submeter múltiplos dados de formulário em lote (Data Generator)' })
+  async bulkSubmit(@Param('formCode') formCode: string, @Body() dto: BulkSubmitFormDto) {
+    return this.formsService.bulkSubmit(formCode, dto);
   }
 
   @Get(':id/submissions')

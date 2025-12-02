@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
-import { SubmitFormDto } from './dto/submit-form.dto';
+import { SubmitFormDto, BulkSubmitFormDto } from './dto/submit-form.dto';
 
 @Injectable()
 export class FormsService {
@@ -144,6 +144,39 @@ export class FormsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async bulkSubmit(formCode: string, dto: BulkSubmitFormDto) {
+    const form = await this.findByCode(formCode);
+    const batchId = uuidv4();
+
+    const submissions = dto.data.map((data) => {
+      const errors = this.validateFormData(form.schema as Record<string, unknown>, data);
+
+      return {
+        formId: form.id,
+        sessionId: dto.session_id,
+        data: {
+          ...data,
+          _batch_id: batchId,
+          _source: 'data_generator',
+        } as Prisma.InputJsonValue,
+        status: errors.length > 0 ? 'validation_error' : 'submitted',
+        errors,
+        orchestratorCorrelationId: uuidv4(),
+      };
+    });
+
+    const result = await this.prisma.formSubmission.createMany({
+      data: submissions,
+    });
+
+    return {
+      batch_id: batchId,
+      total_submitted: result.count,
+      form_code: formCode,
+      form_name: form.name,
+    };
   }
 
   private validateFormData(

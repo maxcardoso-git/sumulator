@@ -111,6 +111,9 @@ export const formsApi = {
   update: (id: string, data: Partial<CreateFormInput>) => api.put<FormDefinition>(`/forms/${id}`, data),
   delete: (id: string) => api.delete(`/forms/${id}`),
   submit: (formCode: string, data: SubmitFormInput) => api.post(`/forms/${formCode}/submit`, data),
+  bulkSubmit: (formCode: string, data: BulkSubmitFormInput) =>
+    api.post<BulkSubmitFormResult>(`/forms/${formCode}/bulk-submit`, data),
+  getSubmissions: (formId: string) => api.get(`/forms/${formId}/submissions`),
 };
 
 // Data Generator API
@@ -263,6 +266,18 @@ export interface CreateFormInput {
 export interface SubmitFormInput {
   session_id?: string;
   data: Record<string, unknown>;
+}
+
+export interface BulkSubmitFormInput {
+  session_id?: string;
+  data: Record<string, unknown>[];
+}
+
+export interface BulkSubmitFormResult {
+  batch_id: string;
+  total_submitted: number;
+  form_code: string;
+  form_name: string;
 }
 
 export interface GenerateDataInput {
