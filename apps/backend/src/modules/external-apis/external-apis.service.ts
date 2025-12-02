@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateExternalApiDto, UpdateExternalApiDto, InvokeExternalApiDto } from './dto';
 
@@ -35,10 +36,10 @@ export class ExternalApisService {
         baseUrl: dto.base_url,
         endpoint: dto.endpoint,
         method: dto.method || 'POST',
-        headers: dto.headers || {},
+        headers: (dto.headers || {}) as Prisma.InputJsonValue,
         authType: dto.auth_type,
-        authConfig: dto.auth_config || {},
-        requestBody: dto.request_body || {},
+        authConfig: (dto.auth_config || {}) as Prisma.InputJsonValue,
+        requestBody: (dto.request_body || {}) as Prisma.InputJsonValue,
         timeout: dto.timeout || 30000,
         enabled: dto.enabled ?? true,
       },
@@ -103,24 +104,30 @@ export class ExternalApisService {
   async update(id: string, dto: UpdateExternalApiDto) {
     await this.findOne(id);
 
+    const updateData: Prisma.ExternalApiUpdateInput = {};
+
+    if (dto.environment_id) {
+      updateData.environment = { connect: { id: dto.environment_id } };
+    }
+    if (dto.form_id !== undefined) {
+      updateData.form = dto.form_id ? { connect: { id: dto.form_id } } : { disconnect: true };
+    }
+    if (dto.name) updateData.name = dto.name;
+    if (dto.code) updateData.code = dto.code;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.base_url) updateData.baseUrl = dto.base_url;
+    if (dto.endpoint) updateData.endpoint = dto.endpoint;
+    if (dto.method) updateData.method = dto.method;
+    if (dto.headers) updateData.headers = dto.headers as Prisma.InputJsonValue;
+    if (dto.auth_type !== undefined) updateData.authType = dto.auth_type;
+    if (dto.auth_config) updateData.authConfig = dto.auth_config as Prisma.InputJsonValue;
+    if (dto.request_body) updateData.requestBody = dto.request_body as Prisma.InputJsonValue;
+    if (dto.timeout) updateData.timeout = dto.timeout;
+    if (dto.enabled !== undefined) updateData.enabled = dto.enabled;
+
     return this.prisma.externalApi.update({
       where: { id },
-      data: {
-        ...(dto.environment_id && { environmentId: dto.environment_id }),
-        ...(dto.form_id !== undefined && { formId: dto.form_id }),
-        ...(dto.name && { name: dto.name }),
-        ...(dto.code && { code: dto.code }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.base_url && { baseUrl: dto.base_url }),
-        ...(dto.endpoint && { endpoint: dto.endpoint }),
-        ...(dto.method && { method: dto.method }),
-        ...(dto.headers && { headers: dto.headers }),
-        ...(dto.auth_type !== undefined && { authType: dto.auth_type }),
-        ...(dto.auth_config && { authConfig: dto.auth_config }),
-        ...(dto.request_body && { requestBody: dto.request_body }),
-        ...(dto.timeout && { timeout: dto.timeout }),
-        ...(dto.enabled !== undefined && { enabled: dto.enabled }),
-      },
+      data: updateData,
       include: {
         environment: {
           select: { id: true, name: true, code: true },
