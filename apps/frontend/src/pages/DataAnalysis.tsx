@@ -66,6 +66,13 @@ interface TransactionData {
   byType: Record<string, number>;
 }
 
+interface DailyData {
+  day: number;
+  total: number;
+  count: number;
+  avg: number;
+}
+
 const MONTHS_OPTIONS = [
   { value: 'Jan', label: 'Janeiro' },
   { value: 'Fev', label: 'Fevereiro' },
@@ -97,6 +104,7 @@ export function DataAnalysisPage() {
   const [dataSeed, setDataSeed] = useState<number>(Date.now());
   const [selectedMonths, setSelectedMonths] = useState<string[]>(MONTHS_OPTIONS.map(m => m.value));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+  const [selectedMonthForDaily, setSelectedMonthForDaily] = useState<string | null>(null);
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -187,6 +195,53 @@ export function DataAnalysisPage() {
       avg: count > 0 ? Math.round(total / count) : 0,
     };
   }, [monthlyData]);
+
+  // Generate daily data for selected month
+  const dailyData = useMemo<DailyData[]>(() => {
+    if (!selectedMonthForDaily || !stats?.form_submissions?.total) return [];
+
+    const monthIndex = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].indexOf(selectedMonthForDaily);
+    if (monthIndex === -1) return [];
+
+    // Get days in month
+    const year = parseInt(selectedYear);
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+    // Get the monthly data for this month
+    const monthData = monthlyData.find(m => m.month === selectedMonthForDaily);
+    if (!monthData) return [];
+
+    const dailyCount = Math.floor(monthData.count / daysInMonth);
+    const dailyTotal = Math.floor(monthData.total / daysInMonth);
+
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const daySeed = dataSeed + year * 1000 + monthIndex * 100 + day;
+      const variance = seededRandom(daySeed, day) * 0.6 - 0.3; // -30% to +30%
+      const count = Math.max(1, Math.floor(dailyCount * (1 + variance)));
+      const total = Math.round(dailyTotal * (1 + variance));
+
+      return {
+        day,
+        total,
+        count,
+        avg: count > 0 ? Math.round(total / count) : 0,
+      };
+    });
+  }, [selectedMonthForDaily, stats, selectedYear, monthlyData, dataSeed, seededRandom]);
+
+  // Handler for bar click
+  const handleBarClick = (data: { month?: string }) => {
+    if (data?.month) {
+      setSelectedMonthForDaily(prev => prev === data.month ? null : data.month);
+    }
+  };
+
+  // Get full month name for display
+  const getMonthFullName = (abbr: string) => {
+    const option = MONTHS_OPTIONS.find(m => m.value === abbr);
+    return option?.label || abbr;
+  };
 
   const handleExplainWithAI = async () => {
     if (!selectedApi) {
@@ -382,9 +437,12 @@ export function DataAnalysisPage() {
           {/* Charts */}
           <SimpleGrid cols={{ base: 1, lg: 2 }}>
             <Paper withBorder p="md">
-              <Text fw={600} mb="md">Volume Mensal</Text>
+              <Group justify="space-between" mb="md">
+                <Text fw={600}>Volume Mensal</Text>
+                <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
+              </Group>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyData}>
+                <BarChart data={monthlyData} onClick={(e) => e?.activePayload?.[0]?.payload && handleBarClick(e.activePayload[0].payload)}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -392,7 +450,20 @@ export function DataAnalysisPage() {
                     formatter={(value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   />
                   <Legend />
-                  <Bar dataKey="total" fill="#228be6" name="Valor Total" />
+                  <Bar
+                    dataKey="total"
+                    name="Valor Total"
+                    cursor="pointer"
+                  >
+                    {monthlyData.map((entry) => (
+                      <Cell
+                        key={`cell-${entry.month}`}
+                        fill={entry.month === selectedMonthForDaily ? '#1971c2' : '#228be6'}
+                        stroke={entry.month === selectedMonthForDaily ? '#1864ab' : undefined}
+                        strokeWidth={entry.month === selectedMonthForDaily ? 2 : 0}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </Paper>
@@ -421,20 +492,58 @@ export function DataAnalysisPage() {
             </Paper>
           </SimpleGrid>
 
-          <Paper withBorder p="md">
-            <Text fw={600} mb="md">Tendencia Mensal (Quantidade)</Text>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="count" stroke="#228be6" name="Quantidade" strokeWidth={2} />
-                <Line type="monotone" dataKey="avg" stroke="#40c057" name="Valor Medio" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Paper>
+          <SimpleGrid cols={{ base: 1, lg: selectedMonthForDaily ? 2 : 1 }}>
+            <Paper withBorder p="md">
+              <Text fw={600} mb="md">Tendencia Mensal (Quantidade)</Text>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="count" stroke="#228be6" name="Quantidade" strokeWidth={2} />
+                  <Line type="monotone" dataKey="avg" stroke="#40c057" name="Valor Medio" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Paper>
+
+            {selectedMonthForDaily && dailyData.length > 0 && (
+              <Paper withBorder p="md">
+                <Group justify="space-between" mb="md">
+                  <Text fw={600}>
+                    Tendencia Diaria - {getMonthFullName(selectedMonthForDaily)} {selectedYear}
+                  </Text>
+                  <Button
+                    variant="subtle"
+                    size="xs"
+                    color="gray"
+                    onClick={() => setSelectedMonthForDaily(null)}
+                  >
+                    Fechar
+                  </Button>
+                </Group>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dailyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Valor Total') {
+                          return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        }
+                        return value.toLocaleString('pt-BR');
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#228be6" name="Quantidade" strokeWidth={2} />
+                    <Line type="monotone" dataKey="total" stroke="#40c057" name="Valor Total" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Paper>
+            )}
+          </SimpleGrid>
         </>
       )}
 
