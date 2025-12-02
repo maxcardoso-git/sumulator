@@ -49,7 +49,6 @@ import {
   formsApi,
   GenerateDataResult,
   DeleteDataInput,
-  BulkSubmitFormResult,
 } from '../lib/api';
 
 interface DistributionConfig {
