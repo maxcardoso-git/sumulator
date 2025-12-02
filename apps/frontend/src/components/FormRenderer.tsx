@@ -11,7 +11,7 @@ import {
   Group,
   SimpleGrid,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DateInput, TimeInput } from '@mantine/dates';
 
 export interface JsonSchemaProperty {
   type: string;
@@ -115,6 +115,18 @@ export function FormRenderer({ schema, readOnly = true }: FormRendererProps) {
               disabled={readOnly}
               withAsterisk={isRequired}
               valueFormat="DD/MM/YYYY HH:mm"
+            />
+          );
+        }
+        if (prop.format === 'time') {
+          return (
+            <TimeInput
+              key={name}
+              label={label}
+              description={description}
+              required={isRequired}
+              disabled={readOnly}
+              withAsterisk={isRequired}
             />
           );
         }

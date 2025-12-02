@@ -33,7 +33,7 @@ export interface FormField {
   id: string;
   name: string;
   label: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'email' | 'select' | 'textarea';
+  type: 'string' | 'number' | 'boolean' | 'date' | 'time' | 'email' | 'select' | 'textarea';
   required: boolean;
   placeholder?: string;
   description?: string;
@@ -72,6 +72,7 @@ const fieldTypes = [
   { value: 'number', label: 'Número' },
   { value: 'boolean', label: 'Booleano' },
   { value: 'date', label: 'Data' },
+  { value: 'time', label: 'Hora' },
   { value: 'email', label: 'Email' },
   { value: 'select', label: 'Seleção' },
   { value: 'textarea', label: 'Texto Longo' },
@@ -584,6 +585,12 @@ export function FormBuilder({ fields, onChange, showDataGeneratorConfig = true }
                                         Datas serão geradas aleatoriamente nos últimos 6 meses.
                                       </Text>
                                     )}
+
+                                    {field.type === 'time' && (
+                                      <Text size="sm" c="dimmed">
+                                        Horários serão gerados aleatoriamente entre 00:00 e 23:59.
+                                      </Text>
+                                    )}
                                   </Paper>
                                 )}
                               </>
@@ -644,6 +651,10 @@ export function fieldsToJsonSchema(fields: FormField[]): Record<string, unknown>
       case 'date':
         prop.type = 'string';
         prop.format = 'date';
+        break;
+      case 'time':
+        prop.type = 'string';
+        prop.format = 'time';
         break;
       case 'email':
         prop.type = 'string';
@@ -747,6 +758,8 @@ export function jsonSchemaToFields(
       type = 'number';
     } else if (prop.format === 'date') {
       type = 'date';
+    } else if (prop.format === 'time') {
+      type = 'time';
     } else if (prop.format === 'email') {
       type = 'email';
     } else if (prop.enum) {
