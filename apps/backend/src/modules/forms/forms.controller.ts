@@ -29,6 +29,12 @@ export class FormsController {
     return this.formsService.findAll(environmentId);
   }
 
+  @Get('stats/summary')
+  @ApiOperation({ summary: 'Obter estatísticas de submissões de formulário' })
+  async getStats(@Query('form_id') formId?: string) {
+    return this.formsService.getStats(formId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar formulário por ID' })
   async findById(@Param('id') id: string) {
