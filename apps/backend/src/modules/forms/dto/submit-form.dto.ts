@@ -1,6 +1,5 @@
-import { IsObject, IsUUID, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsObject, IsUUID, IsOptional, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 
 export class SubmitFormDto {
   @ApiPropertyOptional({ example: 'uuid-of-session' })
@@ -33,7 +32,5 @@ export class BulkSubmitFormDto {
     ],
   })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => Object)
   data: Record<string, unknown>[];
 }
