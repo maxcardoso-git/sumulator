@@ -114,6 +114,8 @@ export const formsApi = {
   bulkSubmit: (formCode: string, data: BulkSubmitFormInput) =>
     api.post<BulkSubmitFormResult>(`/forms/${formCode}/bulk-submit`, data),
   getSubmissions: (formId: string) => api.get(`/forms/${formId}/submissions`),
+  getStats: (formId?: string) =>
+    api.get<FormSubmissionsStats>(`/forms/stats/summary${formId ? `?form_id=${formId}` : ''}`),
 };
 
 // Data Generator API
@@ -429,6 +431,13 @@ export interface DataGeneratorStats {
   };
   operational_events?: {
     total: number;
+  };
+}
+
+export interface FormSubmissionsStats {
+  form_submissions: {
+    total: number;
+    data_generator_generated: number;
   };
 }
 

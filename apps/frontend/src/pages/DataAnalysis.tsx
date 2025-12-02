@@ -50,9 +50,9 @@ import {
 import {
   formsApi,
   externalApisApi,
-  dataGeneratorApi,
   ExternalApi,
   InvokeExternalApiResult,
+  FormSubmissionsStats,
 } from '../lib/api';
 
 const COLORS = ['#228be6', '#40c057', '#fab005', '#fa5252', '#7950f2', '#15aabf', '#fd7e14', '#e64980'];
@@ -105,8 +105,8 @@ export function DataAnalysisPage() {
   });
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
-    queryKey: ['data-generator-stats', selectedFormId],
-    queryFn: () => dataGeneratorApi.getStats('transactions'),
+    queryKey: ['form-submissions-stats', selectedFormId],
+    queryFn: () => formsApi.getStats(selectedFormId || undefined),
   });
 
   const handleFormChange = (formId: string | null) => {
@@ -130,10 +130,10 @@ export function DataAnalysisPage() {
 
   // Simulated monthly data (in a real app, this would come from an API)
   const monthlyData = useMemo<TransactionData[]>(() => {
-    if (!stats?.transactions?.total) return [];
+    if (!stats?.form_submissions?.total) return [];
 
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const total = stats.transactions.total;
+    const total = stats.form_submissions.total;
     const perMonth = Math.floor(total / 12);
 
     // Generate data for all months, then filter
@@ -329,7 +329,7 @@ export function DataAnalysisPage() {
         <Center py="xl">
           <Loader size="lg" />
         </Center>
-      ) : !stats?.transactions?.total ? (
+      ) : !stats?.form_submissions?.total ? (
         <Alert
           icon={<IconDatabaseOff size={24} />}
           title="Sem dados"

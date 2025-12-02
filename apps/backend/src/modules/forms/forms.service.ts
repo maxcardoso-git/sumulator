@@ -179,6 +179,29 @@ export class FormsService {
     };
   }
 
+  async getStats(formId?: string) {
+    const where = formId ? { formId } : {};
+
+    const total = await this.prisma.formSubmission.count({ where });
+
+    const dataGeneratorCount = await this.prisma.formSubmission.count({
+      where: {
+        ...where,
+        data: {
+          path: ['_source'],
+          equals: 'data_generator',
+        },
+      },
+    });
+
+    return {
+      form_submissions: {
+        total,
+        data_generator_generated: dataGeneratorCount,
+      },
+    };
+  }
+
   private validateFormData(
     schema: Record<string, unknown>,
     data: Record<string, unknown>,
