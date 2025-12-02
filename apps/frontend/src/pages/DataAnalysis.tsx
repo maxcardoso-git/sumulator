@@ -18,6 +18,7 @@ import {
   Code,
   Divider,
   Center,
+  MultiSelect,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -29,6 +30,7 @@ import {
   IconX,
   IconRefresh,
   IconDatabaseOff,
+  IconCalendar,
 } from '@tabler/icons-react';
 import {
   BarChart,
@@ -65,6 +67,28 @@ interface TransactionData {
   byType: Record<string, number>;
 }
 
+const MONTHS_OPTIONS = [
+  { value: 'Jan', label: 'Janeiro' },
+  { value: 'Fev', label: 'Fevereiro' },
+  { value: 'Mar', label: 'Marco' },
+  { value: 'Abr', label: 'Abril' },
+  { value: 'Mai', label: 'Maio' },
+  { value: 'Jun', label: 'Junho' },
+  { value: 'Jul', label: 'Julho' },
+  { value: 'Ago', label: 'Agosto' },
+  { value: 'Set', label: 'Setembro' },
+  { value: 'Out', label: 'Outubro' },
+  { value: 'Nov', label: 'Novembro' },
+  { value: 'Dez', label: 'Dezembro' },
+];
+
+const currentYear = new Date().getFullYear();
+const YEARS_OPTIONS = [
+  { value: String(currentYear - 2), label: String(currentYear - 2) },
+  { value: String(currentYear - 1), label: String(currentYear - 1) },
+  { value: String(currentYear), label: String(currentYear) },
+];
+
 export function DataAnalysisPage() {
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [aiModal, setAiModal] = useState(false);
@@ -72,6 +96,8 @@ export function DataAnalysisPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedApi, setSelectedApi] = useState<ExternalApi | null>(null);
   const [dataSeed, setDataSeed] = useState<number>(Date.now());
+  const [selectedMonths, setSelectedMonths] = useState<string[]>(MONTHS_OPTIONS.map(m => m.value));
+  const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -110,10 +136,12 @@ export function DataAnalysisPage() {
     const total = stats.transactions.total;
     const perMonth = Math.floor(total / 12);
 
-    return months.map((month, index) => {
-      const variance = seededRandom(dataSeed, index) * 0.4 - 0.2; // -20% to +20%
+    // Generate data for all months, then filter
+    const allMonthsData = months.map((month, index) => {
+      const yearSeed = parseInt(selectedYear) * 1000;
+      const variance = seededRandom(dataSeed + yearSeed, index) * 0.4 - 0.2; // -20% to +20%
       const count = Math.max(1, Math.floor(perMonth * (1 + variance)));
-      const avgValue = 1000 + seededRandom(dataSeed, index + 12) * 4000;
+      const avgValue = 1000 + seededRandom(dataSeed + yearSeed, index + 12) * 4000;
 
       return {
         month,
@@ -130,7 +158,10 @@ export function DataAnalysisPage() {
         },
       };
     });
-  }, [stats, dataSeed]);
+
+    // Filter by selected months
+    return allMonthsData.filter(m => selectedMonths.includes(m.month));
+  }, [stats, dataSeed, selectedMonths, selectedYear]);
 
   const pieData = useMemo(() => {
     if (!monthlyData.length) return [];
@@ -253,6 +284,44 @@ export function DataAnalysisPage() {
               Explique com IA
             </Button>
           )}
+        </Group>
+      </Paper>
+
+      {/* Date Filters */}
+      <Paper withBorder p="md">
+        <Group align="flex-end">
+          <Select
+            label="Ano"
+            placeholder="Selecione o ano"
+            leftSection={<IconCalendar size={16} />}
+            data={YEARS_OPTIONS}
+            value={selectedYear}
+            onChange={(value) => value && setSelectedYear(value)}
+            style={{ minWidth: 120 }}
+          />
+          <MultiSelect
+            label="Meses"
+            placeholder="Selecione os meses"
+            data={MONTHS_OPTIONS}
+            value={selectedMonths}
+            onChange={setSelectedMonths}
+            style={{ minWidth: 400 }}
+            searchable
+            clearable
+          />
+          <Button
+            variant="light"
+            onClick={() => setSelectedMonths(MONTHS_OPTIONS.map(m => m.value))}
+          >
+            Todos
+          </Button>
+          <Button
+            variant="light"
+            color="gray"
+            onClick={() => setSelectedMonths([])}
+          >
+            Limpar
+          </Button>
         </Group>
       </Paper>
 
