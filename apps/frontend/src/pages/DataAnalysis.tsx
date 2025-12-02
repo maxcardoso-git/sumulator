@@ -52,7 +52,6 @@ import {
   externalApisApi,
   ExternalApi,
   InvokeExternalApiResult,
-  FormSubmissionsStats,
 } from '../lib/api';
 
 const COLORS = ['#228be6', '#40c057', '#fab005', '#fa5252', '#7950f2', '#15aabf', '#fd7e14', '#e64980'];
