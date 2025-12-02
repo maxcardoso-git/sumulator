@@ -24,10 +24,12 @@ import {
   Tabs,
   ScrollArea,
   Code,
+  Tooltip,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import { TimeInput } from '@mantine/dates';
 import {
   IconPlayerPlay,
   IconTrash,
@@ -38,6 +40,9 @@ import {
   IconChartBar,
   IconForms,
   IconRefresh,
+  IconCalendar,
+  IconClock,
+  IconInfoCircle,
 } from '@tabler/icons-react';
 import {
   dataGeneratorApi,
@@ -69,10 +74,64 @@ interface FormGeneratedData {
   generatedAt: string;
 }
 
+// Interface para opcoes de geracao de data/hora
+interface DateTimeGenerationOptions {
+  year: number;
+  month: number;
+  day?: number;
+  time?: string; // formato HH:mm
+}
+
+// Funcao para gerar data/hora baseada nas opcoes
+function generateDateTime(options: DateTimeGenerationOptions): Date {
+  const { year, month, day, time } = options;
+
+  // Determina o dia
+  let finalDay: number;
+  if (day) {
+    finalDay = day;
+  } else {
+    // Gera dia aleatorio dentro do mes
+    const daysInMonth = new Date(year, month, 0).getDate();
+    finalDay = Math.floor(Math.random() * daysInMonth) + 1;
+  }
+
+  // Determina hora e minuto
+  let hours: number;
+  let minutes: number;
+  if (time) {
+    const [h, m] = time.split(':').map(Number);
+    hours = h;
+    // Varia os minutos em +/- 30 minutos do horario informado
+    minutes = Math.max(0, Math.min(59, m + Math.floor(Math.random() * 60) - 30));
+  } else {
+    // Horario aleatorio
+    hours = Math.floor(Math.random() * 24);
+    minutes = Math.floor(Math.random() * 60);
+  }
+
+  return new Date(year, month - 1, finalDay, hours, minutes);
+}
+
+// Funcao para gerar horario baseado nas opcoes
+function generateTime(time?: string): string {
+  if (time) {
+    const [h, m] = time.split(':').map(Number);
+    // Varia os minutos em +/- 30 minutos do horario informado
+    const minutes = Math.max(0, Math.min(59, m + Math.floor(Math.random() * 60) - 30));
+    return `${String(h).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+  // Horario aleatorio
+  const hours = Math.floor(Math.random() * 24);
+  const minutes = Math.floor(Math.random() * 60);
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 // Função para gerar valor baseado no tipo do campo do schema
 function generateValueForField(
   fieldName: string,
-  fieldSchema: Record<string, unknown>
+  fieldSchema: Record<string, unknown>,
+  dateTimeOptions?: DateTimeGenerationOptions
 ): unknown {
   const fieldType = fieldSchema.type as string;
   const format = fieldSchema.format as string | undefined;
@@ -90,7 +149,16 @@ function generateValueForField(
         const domains = ['email.com', 'empresa.com.br', 'teste.com'];
         return `${names[Math.floor(Math.random() * names.length)]}${Math.floor(Math.random() * 1000)}@${domains[Math.floor(Math.random() * domains.length)]}`;
       }
+      if (format === 'time') {
+        return generateTime(dateTimeOptions?.time);
+      }
       if (format === 'date' || format === 'date-time') {
+        if (dateTimeOptions) {
+          const date = generateDateTime(dateTimeOptions);
+          return format === 'date'
+            ? date.toISOString().split('T')[0]
+            : date.toISOString();
+        }
         const date = new Date();
         date.setDate(date.getDate() - Math.floor(Math.random() * 365));
         return format === 'date'
@@ -147,7 +215,8 @@ function generateValueForField(
 // Função para gerar dados baseados no schema do formulário
 function generateDataFromSchema(
   schema: Record<string, unknown>,
-  count: number
+  count: number,
+  dateTimeOptions?: DateTimeGenerationOptions
 ): Record<string, unknown>[] {
   const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
   if (!properties) return [];
@@ -156,7 +225,7 @@ function generateDataFromSchema(
   for (let i = 0; i < count; i++) {
     const row: Record<string, unknown> = {};
     for (const [fieldName, fieldSchema] of Object.entries(properties)) {
-      row[fieldName] = generateValueForField(fieldName, fieldSchema);
+      row[fieldName] = generateValueForField(fieldName, fieldSchema, dateTimeOptions);
     }
     row._generated_at = new Date().toISOString();
     row._row_index = i + 1;
@@ -176,6 +245,13 @@ export function DataGeneratorPage() {
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [formRowCount, setFormRowCount] = useState<number>(10);
   const [formGeneratedData, setFormGeneratedData] = useState<FormGeneratedData[]>([]);
+
+  // Estados para filtros de data/hora
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -329,6 +405,41 @@ export function DataGeneratorPage() {
     return true;
   });
 
+  // Opcoes para dias do mes
+  const getDaysOptions = () => {
+    const year = parseInt(selectedYear);
+    const month = parseInt(selectedMonth);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => ({
+      value: String(i + 1),
+      label: String(i + 1).padStart(2, '0'),
+    }));
+  };
+
+  // Opcoes para meses
+  const monthsOptions = [
+    { value: '1', label: '01 - Janeiro' },
+    { value: '2', label: '02 - Fevereiro' },
+    { value: '3', label: '03 - Marco' },
+    { value: '4', label: '04 - Abril' },
+    { value: '5', label: '05 - Maio' },
+    { value: '6', label: '06 - Junho' },
+    { value: '7', label: '07 - Julho' },
+    { value: '8', label: '08 - Agosto' },
+    { value: '9', label: '09 - Setembro' },
+    { value: '10', label: '10 - Outubro' },
+    { value: '11', label: '11 - Novembro' },
+    { value: '12', label: '12 - Dezembro' },
+  ];
+
+  // Opcoes para anos
+  const yearsOptions = [
+    { value: String(currentYear - 2), label: String(currentYear - 2) },
+    { value: String(currentYear - 1), label: String(currentYear - 1) },
+    { value: String(currentYear), label: String(currentYear) },
+    { value: String(currentYear + 1), label: String(currentYear + 1) },
+  ];
+
   // Função para gerar dados por formulário
   const handleGenerateFormData = () => {
     if (!selectedForm) {
@@ -340,7 +451,15 @@ export function DataGeneratorPage() {
       return;
     }
 
-    const generatedData = generateDataFromSchema(selectedForm.schema, formRowCount);
+    // Monta as opcoes de data/hora
+    const dateTimeOptions: DateTimeGenerationOptions = {
+      year: parseInt(selectedYear),
+      month: parseInt(selectedMonth),
+      day: selectedDay ? parseInt(selectedDay) : undefined,
+      time: selectedTime || undefined,
+    };
+
+    const generatedData = generateDataFromSchema(selectedForm.schema, formRowCount, dateTimeOptions);
 
     const newFormData: FormGeneratedData = {
       formId: selectedForm.id,
@@ -353,9 +472,14 @@ export function DataGeneratorPage() {
     // Adiciona ao início da lista (mais recente primeiro)
     setFormGeneratedData((prev) => [newFormData, ...prev]);
 
+    // Monta mensagem descritiva
+    let dateDesc = `${selectedMonth.padStart(2, '0')}/${selectedYear}`;
+    if (selectedDay) dateDesc = `${selectedDay.padStart(2, '0')}/${dateDesc}`;
+    if (selectedTime) dateDesc += ` ${selectedTime}`;
+
     notifications.show({
       title: 'Dados Gerados',
-      message: `${formRowCount} registros gerados para o formulário "${selectedForm.name}"`,
+      message: `${formRowCount} registros gerados para "${selectedForm.name}" - Periodo: ${dateDesc}`,
       color: 'green',
     });
   };
@@ -772,6 +896,63 @@ export function DataGeneratorPage() {
                     Gerar Dados
                   </Button>
                 </Group>
+
+                {/* Configuração de Data/Hora para Geração */}
+                <Paper withBorder p="sm" bg="gray.0">
+                  <Group justify="space-between" mb="xs">
+                    <Group gap="xs">
+                      <IconCalendar size={16} />
+                      <Text size="sm" fw={600}>Configuração de Data/Hora</Text>
+                    </Group>
+                    <Tooltip
+                      label="Ano e mês são obrigatórios. Dia e hora são opcionais - se não informados, serão gerados aleatoriamente."
+                      multiline
+                      w={280}
+                    >
+                      <IconInfoCircle size={16} color="var(--mantine-color-blue-6)" style={{ cursor: 'help' }} />
+                    </Tooltip>
+                  </Group>
+                  <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
+                    <Select
+                      label="Ano"
+                      placeholder="Selecione"
+                      leftSection={<IconCalendar size={14} />}
+                      data={yearsOptions}
+                      value={selectedYear}
+                      onChange={(v) => v && setSelectedYear(v)}
+                      required
+                      withAsterisk
+                    />
+                    <Select
+                      label="Mês"
+                      placeholder="Selecione"
+                      data={monthsOptions}
+                      value={selectedMonth}
+                      onChange={(v) => v && setSelectedMonth(v)}
+                      required
+                      withAsterisk
+                    />
+                    <Select
+                      label="Dia"
+                      placeholder="Aleatório"
+                      description="Opcional"
+                      data={getDaysOptions()}
+                      value={selectedDay}
+                      onChange={setSelectedDay}
+                      clearable
+                    />
+                    <TimeInput
+                      label="Horário"
+                      description="Opcional"
+                      leftSection={<IconClock size={14} />}
+                      value={selectedTime || ''}
+                      onChange={(e) => setSelectedTime(e.currentTarget.value || null)}
+                    />
+                  </SimpleGrid>
+                  <Text size="xs" c="dimmed" mt="xs">
+                    Campos de data/hora no schema usarão estas configurações. Dia vazio = dias aleatórios no mês. Horário vazio = horários aleatórios (minutos variam ±30min se hora informada).
+                  </Text>
+                </Paper>
 
                 {selectedForm && (
                   <Paper withBorder p="sm" bg="gray.0">
