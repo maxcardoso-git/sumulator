@@ -471,7 +471,7 @@ export interface InvokeExternalApiResult {
     url: string;
     method: string;
     headers: Record<string, string>;
-    body: unknown;
+    body: Record<string, unknown> | null;
   };
 }
 
