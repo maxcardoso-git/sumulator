@@ -21,16 +21,19 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconTrash, IconEye, IconCode, IconForms, IconCopy, IconCheck } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconEye, IconEdit, IconCode, IconForms, IconCopy, IconCheck } from '@tabler/icons-react';
 import { formsApi, environmentsApi, FormDefinition } from '../lib/api';
-import { FormBuilder, FormField, fieldsToJsonSchema, fieldsToUiSchema } from '../components/FormBuilder';
+import { FormBuilder, FormField, fieldsToJsonSchema, fieldsToUiSchema, jsonSchemaToFields } from '../components/FormBuilder';
 import { FormRenderer } from '../components/FormRenderer';
 
 export function FormsPage() {
   const [createModal, setCreateModal] = useState(false);
   const [viewModal, setViewModal] = useState<FormDefinition | null>(null);
+  const [editModal, setEditModal] = useState<FormDefinition | null>(null);
   const [builderFields, setBuilderFields] = useState<FormField[]>([]);
+  const [editBuilderFields, setEditBuilderFields] = useState<FormField[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>('builder');
+  const [editActiveTab, setEditActiveTab] = useState<string | null>('builder');
   const [viewTab, setViewTab] = useState<string | null>('preview');
   const queryClient = useQueryClient();
 
@@ -78,9 +81,39 @@ export function FormsPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof formsApi.update>[1] }) =>
+      formsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms'] });
+      setEditModal(null);
+      editForm.reset();
+      setEditBuilderFields([]);
+      notifications.show({
+        title: 'Sucesso',
+        message: 'Formulário atualizado com sucesso',
+        color: 'green',
+      });
+    },
+    onError: (error) => {
+      notifications.show({
+        title: 'Erro',
+        message: error instanceof Error ? error.message : 'Erro ao atualizar formulário',
+        color: 'red',
+      });
+    },
+  });
+
   const form = useForm({
     initialValues: {
       environment_id: '',
+      name: '',
+      code: '',
+    },
+  });
+
+  const editForm = useForm({
+    initialValues: {
       name: '',
       code: '',
     },
@@ -124,6 +157,56 @@ export function FormsPage() {
     setBuilderFields([]);
     setActiveTab('builder');
     setCreateModal(true);
+  };
+
+  const openEditModal = (formDef: FormDefinition) => {
+    editForm.setValues({
+      name: formDef.name,
+      code: formDef.code,
+    });
+    const fields = jsonSchemaToFields(
+      formDef.schema as Record<string, unknown>,
+      formDef.uiSchema as Record<string, unknown>
+    );
+    setEditBuilderFields(fields);
+    setEditActiveTab('builder');
+    setEditModal(formDef);
+  };
+
+  const handleEdit = (values: typeof editForm.values) => {
+    if (!editModal) return;
+
+    if (editBuilderFields.length === 0) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Adicione pelo menos um campo ao formulário',
+        color: 'red',
+      });
+      return;
+    }
+
+    const invalidFields = editBuilderFields.filter((f) => !f.name || !f.label);
+    if (invalidFields.length > 0) {
+      notifications.show({
+        title: 'Erro',
+        message: 'Todos os campos precisam ter nome e rótulo definidos',
+        color: 'red',
+      });
+      return;
+    }
+
+    const schema = fieldsToJsonSchema(editBuilderFields);
+    const uiSchema = fieldsToUiSchema(editBuilderFields);
+
+    updateMutation.mutate({
+      id: editModal.id,
+      data: {
+        name: values.name,
+        code: values.code,
+        schema,
+        ui_schema: uiSchema,
+      },
+    });
   };
 
   const generatedSchema = fieldsToJsonSchema(builderFields);
@@ -188,6 +271,11 @@ export function FormsPage() {
                       <Tooltip label="Visualizar">
                         <ActionIcon variant="subtle" onClick={() => setViewModal(f)}>
                           <IconEye size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Editar">
+                        <ActionIcon variant="subtle" color="blue" onClick={() => openEditModal(f)}>
+                          <IconEdit size={16} />
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip label="Remover">
@@ -387,6 +475,104 @@ export function FormsPage() {
               </Tabs.Panel>
             </Tabs>
           </Stack>
+        )}
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        opened={!!editModal}
+        onClose={() => setEditModal(null)}
+        title="Editar Formulário"
+        size="xl"
+        styles={{ body: { minHeight: 500 } }}
+      >
+        {editModal && (
+          <form onSubmit={editForm.onSubmit(handleEdit)}>
+            <Stack>
+              <Group>
+                <Badge variant="outline">Ambiente: {editModal.environment.name}</Badge>
+              </Group>
+
+              <Group grow>
+                <TextInput label="Nome" placeholder="Nome do formulário" required {...editForm.getInputProps('name')} />
+                <TextInput
+                  label="Código"
+                  placeholder="FORM_CODE"
+                  description="Identificador único"
+                  required
+                  {...editForm.getInputProps('code')}
+                />
+              </Group>
+
+              <Tabs value={editActiveTab} onChange={setEditActiveTab}>
+                <Tabs.List>
+                  <Tabs.Tab value="builder" leftSection={<IconForms size={16} />}>
+                    Construtor de Campos
+                  </Tabs.Tab>
+                  <Tabs.Tab value="schema" leftSection={<IconCode size={16} />}>
+                    Schema Gerado
+                  </Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="builder" pt="md">
+                  <FormBuilder fields={editBuilderFields} onChange={setEditBuilderFields} showDataGeneratorConfig />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="schema" pt="md">
+                  <Stack>
+                    <Paper withBorder p="sm">
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm" fw={600}>
+                          JSON Schema
+                        </Text>
+                        <CopyButton value={JSON.stringify(fieldsToJsonSchema(editBuilderFields), null, 2)}>
+                          {({ copied, copy }) => (
+                            <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
+                              <ActionIcon variant="subtle" onClick={copy}>
+                                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
+                        </CopyButton>
+                      </Group>
+                      <ScrollArea h={200}>
+                        <Code block>{JSON.stringify(fieldsToJsonSchema(editBuilderFields), null, 2)}</Code>
+                      </ScrollArea>
+                    </Paper>
+
+                    <Paper withBorder p="sm">
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm" fw={600}>
+                          UI Schema
+                        </Text>
+                        <CopyButton value={JSON.stringify(fieldsToUiSchema(editBuilderFields), null, 2)}>
+                          {({ copied, copy }) => (
+                            <Tooltip label={copied ? 'Copiado!' : 'Copiar'}>
+                              <ActionIcon variant="subtle" onClick={copy}>
+                                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                              </ActionIcon>
+                            </Tooltip>
+                          )}
+                        </CopyButton>
+                      </Group>
+                      <ScrollArea h={150}>
+                        <Code block>{JSON.stringify(fieldsToUiSchema(editBuilderFields), null, 2)}</Code>
+                      </ScrollArea>
+                    </Paper>
+                  </Stack>
+                </Tabs.Panel>
+              </Tabs>
+
+              <Group justify="flex-end">
+                <Button variant="default" onClick={() => setEditModal(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" loading={updateMutation.isPending}>
+                  Salvar Alterações
+                </Button>
+              </Group>
+            </Stack>
+          </form>
         )}
       </Modal>
     </Stack>

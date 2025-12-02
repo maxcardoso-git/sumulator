@@ -580,7 +580,7 @@ export function ExternalApisPage() {
                     <>
                       <Text size="sm" fw={500} mt="sm" mb="xs">Body:</Text>
                       <ScrollArea h={100}>
-                        <Code block>{JSON.stringify(testResult.request.body, null, 2)}</Code>
+                        <Code block>{JSON.stringify(testResult.request.body as Record<string, unknown>, null, 2)}</Code>
                       </ScrollArea>
                     </>
                   )}

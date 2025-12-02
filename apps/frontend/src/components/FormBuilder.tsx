@@ -715,3 +715,79 @@ export function fieldsToDataGeneratorConfig(fields: FormField[]): Record<string,
 
   return config;
 }
+
+// Utility to convert JSON Schema back to FormField[]
+export function jsonSchemaToFields(
+  schema: Record<string, unknown>,
+  uiSchema?: Record<string, unknown>
+): FormField[] {
+  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+  const required = (schema.required as string[]) || [];
+  const order = (uiSchema?.['ui:order'] as string[]) || [];
+
+  if (!properties) return [];
+
+  const fields: FormField[] = [];
+
+  // Use order from uiSchema if available, otherwise use Object.keys
+  const fieldNames = order.length > 0 ? order : Object.keys(properties);
+
+  for (const name of fieldNames) {
+    const prop = properties[name];
+    if (!prop) continue;
+
+    const fieldUi = uiSchema?.[name] as Record<string, unknown> | undefined;
+
+    let type: FormField['type'] = 'string';
+
+    // Determine type from schema
+    if (prop.type === 'boolean') {
+      type = 'boolean';
+    } else if (prop.type === 'number' || prop.type === 'integer') {
+      type = 'number';
+    } else if (prop.format === 'date') {
+      type = 'date';
+    } else if (prop.format === 'email') {
+      type = 'email';
+    } else if (prop.enum) {
+      type = 'select';
+    } else if (fieldUi?.['ui:widget'] === 'textarea') {
+      type = 'textarea';
+    }
+
+    const field: FormField = {
+      id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      label: (prop.title as string) || name,
+      type,
+      required: required.includes(name),
+      description: prop.description as string | undefined,
+      placeholder: fieldUi?.['ui:placeholder'] as string | undefined,
+    };
+
+    // Add type-specific properties
+    if (type === 'string' || type === 'textarea') {
+      if (prop.minLength !== undefined) field.minLength = prop.minLength as number;
+      if (prop.maxLength !== undefined) field.maxLength = prop.maxLength as number;
+      if (prop.pattern !== undefined) field.pattern = prop.pattern as string;
+    }
+
+    if (type === 'number') {
+      if (prop.minimum !== undefined) field.min = prop.minimum as number;
+      if (prop.maximum !== undefined) field.max = prop.maximum as number;
+    }
+
+    if (type === 'select' && prop.enum) {
+      const enumValues = prop.enum as string[];
+      const enumNames = (prop.enumNames as string[]) || enumValues;
+      field.options = enumValues.map((value, index) => ({
+        value,
+        label: enumNames[index] || value,
+      }));
+    }
+
+    fields.push(field);
+  }
+
+  return fields;
+}
