@@ -71,6 +71,7 @@ export function DataAnalysisPage() {
   const [aiResult, setAiResult] = useState<InvokeExternalApiResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedApi, setSelectedApi] = useState<ExternalApi | null>(null);
+  const [dataSeed, setDataSeed] = useState<number>(Date.now());
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -78,15 +79,28 @@ export function DataAnalysisPage() {
   });
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
-    queryKey: ['data-generator-stats'],
+    queryKey: ['data-generator-stats', selectedFormId],
     queryFn: () => dataGeneratorApi.getStats('transactions'),
   });
+
+  const handleFormChange = (formId: string | null) => {
+    setSelectedFormId(formId);
+    setSelectedApi(null);
+    setDataSeed(Date.now()); // Force data regeneration
+    refetchStats();
+  };
 
   const { data: availableApis } = useQuery({
     queryKey: ['external-apis-by-form', selectedFormId],
     queryFn: () => selectedFormId ? externalApisApi.getByForm(selectedFormId) : Promise.resolve([]),
     enabled: !!selectedFormId,
   });
+
+  // Seeded random number generator for consistent data per form
+  const seededRandom = (seed: number, index: number) => {
+    const x = Math.sin(seed + index) * 10000;
+    return x - Math.floor(x);
+  };
 
   // Simulated monthly data (in a real app, this would come from an API)
   const monthlyData = useMemo<TransactionData[]>(() => {
@@ -96,10 +110,10 @@ export function DataAnalysisPage() {
     const total = stats.transactions.total;
     const perMonth = Math.floor(total / 12);
 
-    return months.map((month) => {
-      const variance = Math.random() * 0.4 - 0.2; // -20% to +20%
+    return months.map((month, index) => {
+      const variance = seededRandom(dataSeed, index) * 0.4 - 0.2; // -20% to +20%
       const count = Math.max(1, Math.floor(perMonth * (1 + variance)));
-      const avgValue = 1000 + Math.random() * 4000;
+      const avgValue = 1000 + seededRandom(dataSeed, index + 12) * 4000;
 
       return {
         month,
@@ -116,7 +130,7 @@ export function DataAnalysisPage() {
         },
       };
     });
-  }, [stats]);
+  }, [stats, dataSeed]);
 
   const pieData = useMemo(() => {
     if (!monthlyData.length) return [];
@@ -213,7 +227,7 @@ export function DataAnalysisPage() {
             placeholder="Selecione um formulario"
             data={forms?.map((f) => ({ value: f.id, label: `${f.name} (${f.code})` })) || []}
             value={selectedFormId}
-            onChange={setSelectedFormId}
+            onChange={handleFormChange}
             style={{ minWidth: 300 }}
           />
 
@@ -324,7 +338,7 @@ export function DataAnalysisPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
+                    label={(props) => `${props.name || ''} ${((props.percent || 0) * 100).toFixed(0)}%`}
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"

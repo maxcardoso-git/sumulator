@@ -576,7 +576,7 @@ export function ExternalApisPage() {
                   <ScrollArea h={100}>
                     <Code block>{JSON.stringify(testResult.request.headers, null, 2)}</Code>
                   </ScrollArea>
-                  {testResult.request.body && (
+                  {testResult.request.body !== null && testResult.request.body !== undefined && (
                     <>
                       <Text size="sm" fw={500} mt="sm" mb="xs">Body:</Text>
                       <ScrollArea h={100}>
