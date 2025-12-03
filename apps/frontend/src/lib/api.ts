@@ -447,6 +447,7 @@ export interface ExternalApi {
   name: string;
   code: string;
   description: string | null;
+  apiType: string;
   baseUrl: string;
   endpoint: string;
   method: string;
@@ -469,6 +470,7 @@ export interface CreateExternalApiInput {
   name: string;
   code: string;
   description?: string;
+  api_type?: string;
   base_url: string;
   endpoint: string;
   method?: string;

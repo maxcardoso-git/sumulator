@@ -33,6 +33,7 @@ export class ExternalApisService {
         name: dto.name,
         code: dto.code,
         description: dto.description,
+        apiType: dto.api_type || 'CONSULTA_IA',
         baseUrl: dto.base_url,
         endpoint: dto.endpoint,
         method: dto.method || 'POST',

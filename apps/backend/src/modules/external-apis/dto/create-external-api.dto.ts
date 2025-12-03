@@ -34,6 +34,11 @@ export class CreateExternalApiDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: 'CONSULTA_IA', default: 'CONSULTA_IA' })
+  @IsOptional()
+  @IsIn(['CHAT', 'CONSULTA_IA'])
+  api_type?: string;
+
   @ApiProperty({ example: 'https://api.orchestrator.com' })
   @IsString()
   base_url: string;

@@ -133,6 +133,7 @@ export function ExternalApisPage() {
       name: '',
       code: '',
       description: '',
+      api_type: 'CONSULTA_IA',
       base_url: '',
       endpoint: '',
       method: 'POST',
@@ -153,6 +154,7 @@ export function ExternalApisPage() {
         name: values.name,
         code: values.code,
         description: values.description || undefined,
+        api_type: values.api_type,
         base_url: values.base_url,
         endpoint: values.endpoint,
         method: values.method,
@@ -183,6 +185,7 @@ export function ExternalApisPage() {
           name: values.name,
           code: values.code,
           description: values.description || undefined,
+          api_type: values.api_type,
           base_url: values.base_url,
           endpoint: values.endpoint,
           method: values.method,
@@ -232,6 +235,7 @@ export function ExternalApisPage() {
       name: api.name,
       code: api.code,
       description: api.description || '',
+      api_type: api.apiType || 'CONSULTA_IA',
       base_url: api.baseUrl,
       endpoint: api.endpoint,
       method: api.method,
@@ -314,6 +318,15 @@ export function ExternalApisPage() {
               label="Descricao"
               placeholder="API do Orquestrador para analise de dados com IA"
               {...form.getInputProps('description')}
+            />
+            <Select
+              label="Tipo de API"
+              description="Chat: para conversas interativas. Consulta IA: para analise de dados"
+              data={[
+                { value: 'CHAT', label: 'Chat' },
+                { value: 'CONSULTA_IA', label: 'Consulta IA' },
+              ]}
+              {...form.getInputProps('api_type')}
             />
             <Group grow>
               <TextInput

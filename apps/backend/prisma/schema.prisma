@@ -386,6 +386,7 @@ model ExternalApi {
   name          String   @db.VarChar(200)
   code          String   @unique @db.VarChar(100)
   description   String?  @db.Text
+  apiType       String   @default("CONSULTA_IA") @map("api_type") @db.VarChar(50) // CHAT or CONSULTA_IA
   baseUrl       String   @map("base_url") @db.VarChar(500)
   endpoint      String   @db.VarChar(500)
   method        String   @default("POST") @db.VarChar(10)

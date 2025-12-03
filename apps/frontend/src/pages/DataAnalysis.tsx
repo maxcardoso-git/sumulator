@@ -233,7 +233,8 @@ export function DataAnalysisPage() {
   // Handler for bar click
   const handleBarClick = (data: { month?: string }) => {
     if (data?.month) {
-      setSelectedMonthForDaily(prev => prev === data.month ? null : data.month);
+      const month = data.month;
+      setSelectedMonthForDaily(prev => prev === month ? null : month);
     }
   };
 
@@ -442,7 +443,10 @@ export function DataAnalysisPage() {
                 <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
               </Group>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyData} onClick={(e) => e?.activePayload?.[0]?.payload && handleBarClick(e.activePayload[0].payload)}>
+                <BarChart data={monthlyData} onClick={(e) => {
+                  const payload = (e as { activePayload?: { payload?: { month?: string } }[] })?.activePayload?.[0]?.payload;
+                  if (payload) handleBarClick(payload);
+                }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
