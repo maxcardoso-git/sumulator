@@ -19,6 +19,8 @@ import {
   Divider,
   Center,
   MultiSelect,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -38,7 +40,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   PieChart,
@@ -105,6 +107,7 @@ export function DataAnalysisPage() {
   const [selectedMonths, setSelectedMonths] = useState<string[]>(MONTHS_OPTIONS.map(m => m.value));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [selectedMonthForDaily, setSelectedMonthForDaily] = useState<string | null>(null);
+  const [aiChartContext, setAiChartContext] = useState<string>('');
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -244,7 +247,7 @@ export function DataAnalysisPage() {
     return option?.label || abbr;
   };
 
-  const handleExplainWithAI = async () => {
+  const handleExplainWithAI = async (chartContext: string, chartData: unknown) => {
     if (!selectedApi) {
       notifications.show({
         title: 'Erro',
@@ -254,6 +257,7 @@ export function DataAnalysisPage() {
       return;
     }
 
+    setAiChartContext(chartContext);
     setAiModal(true);
     setAiLoading(true);
     setAiResult(null);
@@ -262,19 +266,10 @@ export function DataAnalysisPage() {
       const result = await externalApisApi.invoke(selectedApi.id, {
         payload: {
           form_code: forms?.find((f) => f.id === selectedFormId)?.code,
-          period: 'ultimo_ano',
-          data_summary: {
-            total_value: totalStats.total,
-            transaction_count: totalStats.count,
-            average_value: totalStats.avg,
-            monthly_data: monthlyData.map((m) => ({
-              month: m.month,
-              total: m.total,
-              count: m.count,
-              by_type: m.byType,
-            })),
-            distribution_by_type: pieData,
-          },
+          chart_type: chartContext,
+          period: selectedYear,
+          selected_months: selectedMonths,
+          data: chartData,
         },
       });
       setAiResult(result);
@@ -290,6 +285,78 @@ export function DataAnalysisPage() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  // Prepare chart-specific data for AI explanation
+  const handleExplainVolumeMensal = () => {
+    handleExplainWithAI('Volume Mensal (Total por Mes)', {
+      monthly_totals: monthlyData.map((m) => ({
+        month: m.month,
+        total: m.total,
+        count: m.count,
+      })),
+      summary: {
+        total_value: totalStats.total,
+        total_count: totalStats.count,
+        average_value: totalStats.avg,
+      },
+    });
+  };
+
+  const handleExplainDailyData = () => {
+    if (!selectedMonthForDaily) return;
+    handleExplainWithAI(`Total por Dia - ${getMonthFullName(selectedMonthForDaily)} ${selectedYear}`, {
+      month: selectedMonthForDaily,
+      year: selectedYear,
+      daily_data: dailyData.map((d) => ({
+        day: d.day,
+        total: d.total,
+        count: d.count,
+        avg: d.avg,
+      })),
+      summary: {
+        total_days: dailyData.length,
+        total_value: dailyData.reduce((acc, d) => acc + d.total, 0),
+        total_count: dailyData.reduce((acc, d) => acc + d.count, 0),
+      },
+    });
+  };
+
+  const handleExplainPieChart = () => {
+    handleExplainWithAI('Distribuicao por Tipo', {
+      distribution: pieData,
+      total: pieData.reduce((acc, p) => acc + p.value, 0),
+    });
+  };
+
+  const handleExplainTrendChart = () => {
+    handleExplainWithAI('Tendencia Mensal (Quantidade)', {
+      monthly_trend: monthlyData.map((m) => ({
+        month: m.month,
+        count: m.count,
+        avg: m.avg,
+      })),
+      trend_analysis: {
+        first_month: monthlyData[0]?.count || 0,
+        last_month: monthlyData[monthlyData.length - 1]?.count || 0,
+        growth: monthlyData.length > 1
+          ? ((monthlyData[monthlyData.length - 1]?.count || 0) - (monthlyData[0]?.count || 0)) / (monthlyData[0]?.count || 1) * 100
+          : 0,
+      },
+    });
+  };
+
+  const handleExplainDailyTrend = () => {
+    if (!selectedMonthForDaily) return;
+    handleExplainWithAI(`Tendencia Diaria - ${getMonthFullName(selectedMonthForDaily)} ${selectedYear}`, {
+      month: selectedMonthForDaily,
+      year: selectedYear,
+      daily_trend: dailyData.map((d) => ({
+        day: d.day,
+        count: d.count,
+        total: d.total,
+      })),
+    });
   };
 
   return (
@@ -330,15 +397,6 @@ export function DataAnalysisPage() {
             />
           )}
 
-          {selectedApi && (
-            <Button
-              leftSection={<IconBrain size={16} />}
-              onClick={handleExplainWithAI}
-              style={{ marginTop: 24 }}
-            >
-              Explique com IA
-            </Button>
-          )}
         </Group>
       </Paper>
 
@@ -435,11 +493,25 @@ export function DataAnalysisPage() {
             </Card>
           </SimpleGrid>
 
-          {/* Charts */}
+          {/* Charts - Volume Mensal and Daily Drill-down */}
           <SimpleGrid cols={{ base: 1, lg: 2 }}>
             <Paper withBorder p="md">
               <Group justify="space-between" mb="md">
-                <Text fw={600}>Volume Mensal</Text>
+                <Group gap="xs">
+                  <Text fw={600}>Volume Mensal (Total por Mes)</Text>
+                  {selectedApi && (
+                    <Tooltip label="Explicar com IA">
+                      <ActionIcon
+                        variant="light"
+                        color="violet"
+                        size="sm"
+                        onClick={handleExplainVolumeMensal}
+                      >
+                        <IconBrain size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
                 <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
               </Group>
               <ResponsiveContainer width="100%" height={300}>
@@ -450,7 +522,7 @@ export function DataAnalysisPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip
+                  <RechartsTooltip
                     formatter={(value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   />
                   <Legend />
@@ -472,52 +544,26 @@ export function DataAnalysisPage() {
               </ResponsiveContainer>
             </Paper>
 
-            <Paper withBorder p="md">
-              <Text fw={600} mb="md">Distribuicao por Tipo</Text>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(props) => `${props.name || ''} ${((props.percent || 0) * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </Paper>
-          </SimpleGrid>
-
-          <SimpleGrid cols={{ base: 1, lg: selectedMonthForDaily ? 2 : 1 }}>
-            <Paper withBorder p="md">
-              <Text fw={600} mb="md">Tendencia Mensal (Quantidade)</Text>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="count" stroke="#228be6" name="Quantidade" strokeWidth={2} />
-                  <Line type="monotone" dataKey="avg" stroke="#40c057" name="Valor Medio" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </Paper>
-
-            {selectedMonthForDaily && dailyData.length > 0 && (
+            {selectedMonthForDaily && dailyData.length > 0 ? (
               <Paper withBorder p="md">
                 <Group justify="space-between" mb="md">
-                  <Text fw={600}>
-                    Tendencia Diaria - {getMonthFullName(selectedMonthForDaily)} {selectedYear}
-                  </Text>
+                  <Group gap="xs">
+                    <Text fw={600}>
+                      Total por Dia - {getMonthFullName(selectedMonthForDaily)} {selectedYear}
+                    </Text>
+                    {selectedApi && (
+                      <Tooltip label="Explicar com IA">
+                        <ActionIcon
+                          variant="light"
+                          color="violet"
+                          size="sm"
+                          onClick={handleExplainDailyData}
+                        >
+                          <IconBrain size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                   <Button
                     variant="subtle"
                     size="xs"
@@ -528,11 +574,119 @@ export function DataAnalysisPage() {
                   </Button>
                 </Group>
                 <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dailyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <RechartsTooltip
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Valor Total') {
+                          return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        }
+                        return value.toLocaleString('pt-BR');
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="total" name="Valor Total" fill="#40c057" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Paper>
+            ) : (
+              <Paper withBorder p="md">
+                <Group gap="xs" mb="md">
+                  <Text fw={600}>Distribuicao por Tipo</Text>
+                  {selectedApi && (
+                    <Tooltip label="Explicar com IA">
+                      <ActionIcon
+                        variant="light"
+                        color="violet"
+                        size="sm"
+                        onClick={handleExplainPieChart}
+                      >
+                        <IconBrain size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => `${props.name || ''} ${((props.percent || 0) * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Paper>
+            )}
+          </SimpleGrid>
+
+          {/* Trend Charts */}
+          <SimpleGrid cols={{ base: 1, lg: 2 }}>
+            <Paper withBorder p="md">
+              <Group gap="xs" mb="md">
+                <Text fw={600}>Tendencia Mensal (Quantidade)</Text>
+                {selectedApi && (
+                  <Tooltip label="Explicar com IA">
+                    <ActionIcon
+                      variant="light"
+                      color="violet"
+                      size="sm"
+                      onClick={handleExplainTrendChart}
+                    >
+                      <IconBrain size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </Group>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <RechartsTooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="count" stroke="#228be6" name="Quantidade" strokeWidth={2} />
+                  <Line type="monotone" dataKey="avg" stroke="#40c057" name="Valor Medio" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Paper>
+
+            {selectedMonthForDaily && dailyData.length > 0 ? (
+              <Paper withBorder p="md">
+                <Group gap="xs" mb="md">
+                  <Text fw={600}>
+                    Tendencia Diaria - {getMonthFullName(selectedMonthForDaily)} {selectedYear}
+                  </Text>
+                  {selectedApi && (
+                    <Tooltip label="Explicar com IA">
+                      <ActionIcon
+                        variant="light"
+                        color="violet"
+                        size="sm"
+                        onClick={handleExplainDailyTrend}
+                      >
+                        <IconBrain size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="day" />
                     <YAxis />
-                    <Tooltip
+                    <RechartsTooltip
                       formatter={(value: number, name: string) => {
                         if (name === 'Valor Total') {
                           return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -546,6 +700,43 @@ export function DataAnalysisPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </Paper>
+            ) : (
+              <Paper withBorder p="md">
+                <Group gap="xs" mb="md">
+                  <Text fw={600}>Distribuicao por Tipo</Text>
+                  {selectedApi && (
+                    <Tooltip label="Explicar com IA">
+                      <ActionIcon
+                        variant="light"
+                        color="violet"
+                        size="sm"
+                        onClick={handleExplainPieChart}
+                      >
+                        <IconBrain size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => `${props.name || ''} ${((props.percent || 0) * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Paper>
             )}
           </SimpleGrid>
         </>
@@ -555,7 +746,7 @@ export function DataAnalysisPage() {
       <Modal
         opened={aiModal}
         onClose={() => setAiModal(false)}
-        title="Analise com IA"
+        title={`Analise com IA${aiChartContext ? ` - ${aiChartContext}` : ''}`}
         size="lg"
       >
         <Stack>
@@ -606,11 +797,6 @@ export function DataAnalysisPage() {
             <Button variant="default" onClick={() => setAiModal(false)}>
               Fechar
             </Button>
-            {!aiLoading && (
-              <Button onClick={handleExplainWithAI}>
-                Analisar Novamente
-              </Button>
-            )}
           </Group>
         </Stack>
       </Modal>
