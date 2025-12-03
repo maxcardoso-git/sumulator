@@ -372,6 +372,7 @@ export function ExternalApisPage() {
                 { value: 'BEARER_TOKEN', label: 'Bearer Token' },
                 { value: 'API_KEY', label: 'API Key' },
                 { value: 'BASIC', label: 'Basic Auth' },
+                { value: 'OAUTH2_PASSWORD', label: 'OAuth2 Password (Login Automatico)' },
               ]}
               {...form.getInputProps('auth_type')}
             />
@@ -385,6 +386,8 @@ export function ExternalApisPage() {
                   ? 'Use: {"header_name": "X-API-Key", "api_key": "sua-chave"}'
                   : form.values.auth_type === 'BASIC'
                   ? 'Use: {"username": "user", "password": "pass"}'
+                  : form.values.auth_type === 'OAUTH2_PASSWORD'
+                  ? 'Use: {"login_url": "http://host:port/api/v1/auth/login", "email": "user@email.com", "password": "senha", "token_path": "accessToken"}'
                   : ''
               }
               autosize
@@ -392,6 +395,13 @@ export function ExternalApisPage() {
               formatOnBlur
               {...form.getInputProps('auth_config')}
             />
+            {form.values.auth_type === 'OAUTH2_PASSWORD' && (
+              <Alert color="blue" title="OAuth2 Password Grant">
+                Este tipo de autenticacao faz login automaticamente antes de chamar a API.
+                O sistema ira enviar POST para login_url com {'{'}email, password{'}'} e usar o token retornado.
+                Use token_path para indicar onde esta o token na resposta (ex: "accessToken" ou "data.token").
+              </Alert>
+            )}
           </Stack>
         </Tabs.Panel>
 

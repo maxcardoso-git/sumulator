@@ -183,6 +183,13 @@ export class ExternalApisService {
           headers['Authorization'] = `Basic ${credentials}`;
         }
         break;
+      case 'OAUTH2_PASSWORD':
+        // Login to get access token before making the API call
+        const token = await this.getOAuth2Token(authConfig);
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        break;
     }
 
     // Build request body
@@ -258,6 +265,44 @@ export class ExternalApisService {
         body: body ? JSON.parse(body) : null,
       },
     };
+  }
+
+  private async getOAuth2Token(authConfig: Record<string, unknown>): Promise<string | null> {
+    const loginUrl = authConfig?.login_url as string;
+    const email = authConfig?.email as string;
+    const password = authConfig?.password as string;
+    const tokenPath = (authConfig?.token_path as string) || 'accessToken';
+
+    if (!loginUrl || !email || !password) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(loginUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        console.error(`OAuth2 login failed: ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      const data = await response.json();
+
+      // Navigate to token using tokenPath (supports nested paths like "data.accessToken")
+      const pathParts = tokenPath.split('.');
+      let token = data;
+      for (const part of pathParts) {
+        token = token?.[part];
+      }
+
+      return token as string || null;
+    } catch (error) {
+      console.error('OAuth2 login error:', error);
+      return null;
+    }
   }
 
   private replacePlaceholders(

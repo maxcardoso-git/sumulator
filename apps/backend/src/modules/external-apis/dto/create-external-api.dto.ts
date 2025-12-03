@@ -61,7 +61,7 @@ export class CreateExternalApiDto {
 
   @ApiPropertyOptional({ example: 'BEARER_TOKEN' })
   @IsOptional()
-  @IsIn(['NONE', 'BEARER_TOKEN', 'API_KEY', 'BASIC'])
+  @IsIn(['NONE', 'BEARER_TOKEN', 'API_KEY', 'BASIC', 'OAUTH2_PASSWORD'])
   auth_type?: string;
 
   @ApiPropertyOptional({
