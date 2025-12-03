@@ -233,14 +233,6 @@ export function DataAnalysisPage() {
     });
   }, [selectedMonthForDaily, stats, selectedYear, monthlyData, dataSeed, seededRandom]);
 
-  // Handler for bar click
-  const handleBarClick = (data: { month?: string }) => {
-    if (data?.month) {
-      const month = data.month;
-      setSelectedMonthForDaily(prev => prev === month ? null : month);
-    }
-  };
-
   // Get full month name for display
   const getMonthFullName = (abbr: string) => {
     const option = MONTHS_OPTIONS.find(m => m.value === abbr);
@@ -496,10 +488,7 @@ export function DataAnalysisPage() {
                 <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
               </Group>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyData} onClick={(e) => {
-                  const payload = (e as { activePayload?: { payload?: { month?: string } }[] })?.activePayload?.[0]?.payload;
-                  if (payload) handleBarClick(payload);
-                }}>
+                <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -511,6 +500,11 @@ export function DataAnalysisPage() {
                     dataKey="total"
                     name="Valor Total"
                     cursor="pointer"
+                    onClick={(data) => {
+                      if (data?.month) {
+                        setSelectedMonthForDaily(prev => prev === data.month ? null : data.month);
+                      }
+                    }}
                   >
                     {monthlyData.map((entry) => (
                       <Cell
