@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Title,
@@ -117,6 +117,7 @@ export function DataAnalysisPage() {
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['form-submissions-stats', selectedFormId],
     queryFn: () => formsApi.getStats(selectedFormId || undefined),
+    enabled: !!selectedFormId, // Only fetch when a form is selected
   });
 
   const handleFormChange = (formId: string | null) => {
@@ -131,6 +132,15 @@ export function DataAnalysisPage() {
     queryFn: () => selectedFormId ? externalApisApi.getByForm(selectedFormId) : Promise.resolve([]),
     enabled: !!selectedFormId,
   });
+
+  // Auto-select first API when form has associated APIs
+  useEffect(() => {
+    if (availableApis?.length) {
+      setSelectedApi(availableApis[0]);
+    } else {
+      setSelectedApi(null);
+    }
+  }, [availableApis]);
 
   // Seeded random number generator for consistent data per form
   const seededRandom = (seed: number, index: number) => {
@@ -357,19 +367,16 @@ export function DataAnalysisPage() {
             style={{ minWidth: 300 }}
           />
 
-          {selectedFormId && (
-            <Select
-              label="API de Analise IA"
-              placeholder="Selecione a API"
-              data={availableApis?.map((a) => ({ value: a.id, label: a.name })) || []}
-              value={selectedApi?.id || null}
-              onChange={(id) => setSelectedApi(availableApis?.find((a) => a.id === id) || null)}
-              style={{ minWidth: 300 }}
-              disabled={!availableApis?.length}
-              description={!availableApis?.length ? 'Nenhuma API vinculada a este formulario' : undefined}
-            />
+          {selectedFormId && selectedApi && (
+            <Text size="sm" c="dimmed">
+              API: <Text span fw={500} c="blue">{selectedApi.name}</Text>
+            </Text>
           )}
-
+          {selectedFormId && !availableApis?.length && (
+            <Text size="sm" c="orange">
+              Nenhuma API vinculada a este formulario
+            </Text>
+          )}
         </Group>
       </Paper>
 
@@ -411,7 +418,15 @@ export function DataAnalysisPage() {
         </Group>
       </Paper>
 
-      {statsLoading ? (
+      {!selectedFormId ? (
+        <Alert
+          icon={<IconDatabaseOff size={24} />}
+          title="Selecione um formulario"
+          color="blue"
+        >
+          Selecione um formulario acima para visualizar os dados e graficos.
+        </Alert>
+      ) : statsLoading ? (
         <Center py="xl">
           <Loader size="lg" />
         </Center>
