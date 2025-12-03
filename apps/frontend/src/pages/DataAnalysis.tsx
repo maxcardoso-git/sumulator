@@ -303,25 +303,6 @@ export function DataAnalysisPage() {
     });
   };
 
-  const handleExplainDailyData = () => {
-    if (!selectedMonthForDaily) return;
-    handleExplainWithAI(`Total por Dia - ${getMonthFullName(selectedMonthForDaily)} ${selectedYear}`, {
-      month: selectedMonthForDaily,
-      year: selectedYear,
-      daily_data: dailyData.map((d) => ({
-        day: d.day,
-        total: d.total,
-        count: d.count,
-        avg: d.avg,
-      })),
-      summary: {
-        total_days: dailyData.length,
-        total_value: dailyData.reduce((acc, d) => acc + d.total, 0),
-        total_count: dailyData.reduce((acc, d) => acc + d.count, 0),
-      },
-    });
-  };
-
   const handleExplainPieChart = () => {
     handleExplainWithAI('Distribuicao por Tipo', {
       distribution: pieData,
