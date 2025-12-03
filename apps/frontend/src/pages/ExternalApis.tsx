@@ -39,6 +39,7 @@ import {
   IconSettings,
   IconTestPipe,
   IconLink,
+  IconCopy,
 } from '@tabler/icons-react';
 import {
   externalApisApi,
@@ -254,6 +255,33 @@ export function ExternalApisPage() {
     form.reset();
     setActiveTab('basic');
     setCreateModal(true);
+  };
+
+  const handleCopy = (api: ExternalApi) => {
+    form.setValues({
+      environment_id: api.environment.id,
+      form_id: api.form?.id || '',
+      name: `${api.name} (Copia)`,
+      code: `${api.code}_COPY`,
+      description: api.description || '',
+      api_type: api.apiType || 'CONSULTA_IA',
+      base_url: api.baseUrl,
+      endpoint: api.endpoint,
+      method: api.method,
+      headers: JSON.stringify(api.headers, null, 2),
+      auth_type: api.authType || 'NONE',
+      auth_config: JSON.stringify(api.authConfig, null, 2),
+      request_body: JSON.stringify(api.requestBody, null, 2),
+      timeout: api.timeout,
+      enabled: api.enabled,
+    });
+    setActiveTab('basic');
+    setCreateModal(true);
+    notifications.show({
+      title: 'API copiada',
+      message: 'Altere o nome e codigo antes de salvar',
+      color: 'blue',
+    });
   };
 
   const getStatusBadge = (api: ExternalApi) => {
@@ -520,6 +548,11 @@ export function ExternalApisPage() {
                     <Tooltip label="Testar API">
                       <ActionIcon variant="subtle" color="green" onClick={() => handleTest(api)}>
                         <IconTestPipe size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Copiar API">
+                      <ActionIcon variant="subtle" color="cyan" onClick={() => handleCopy(api)}>
+                        <IconCopy size={16} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Editar">
