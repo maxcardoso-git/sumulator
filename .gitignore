@@ -4,4 +4,13 @@ dist
 .env.*
 *.log
 .DS_Store
-node_modules
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite config build artifacts
+vite.config.js
+vite.config.d.ts
+
+# Claude local settings
+.claude/settings.local.json
