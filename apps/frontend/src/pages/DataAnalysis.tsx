@@ -21,6 +21,7 @@ import {
   MultiSelect,
   ActionIcon,
   Tooltip,
+  SegmentedControl,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -33,9 +34,8 @@ import {
   IconRefresh,
   IconDatabaseOff,
   IconCalendar,
-  IconCode,
-  IconList,
 } from '@tabler/icons-react';
+import { ChartRenderer } from '../components/ChartRenderer';
 import {
   BarChart,
   Bar,
@@ -119,6 +119,65 @@ const formatValue = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.join(', ');
   return JSON.stringify(value);
+};
+
+// Helper function to extract chart data from AI response
+type ChartDataPoint = Record<string, string | number | null | undefined>;
+const extractChartData = (response: unknown): ChartDataPoint[] => {
+  if (!response || typeof response !== 'object') return [];
+
+  const data = response as Record<string, unknown>;
+
+  // Look for common array fields that contain chart data
+  const arrayFields = [
+    'monthly_totals',
+    'data',
+    'results',
+    'items',
+    'records',
+    'values',
+    'chart_data',
+    'series',
+    'metrics',
+    'statistics',
+  ];
+
+  for (const field of arrayFields) {
+    if (Array.isArray(data[field]) && data[field].length > 0) {
+      return data[field] as ChartDataPoint[];
+    }
+  }
+
+  // If response itself is an array
+  if (Array.isArray(response) && response.length > 0) {
+    return response as ChartDataPoint[];
+  }
+
+  // Try to find any array property at the top level
+  for (const key of Object.keys(data)) {
+    if (Array.isArray(data[key]) && (data[key] as unknown[]).length > 0) {
+      const arr = data[key] as unknown[];
+      // Check if array items are objects (not primitives)
+      if (arr[0] && typeof arr[0] === 'object') {
+        return arr as ChartDataPoint[];
+      }
+    }
+  }
+
+  // If no arrays found, try to convert single object to array
+  if (!Array.isArray(response) && typeof response === 'object') {
+    const keys = Object.keys(data);
+    const numericKeys = keys.filter(k => typeof data[k] === 'number');
+    if (numericKeys.length > 0) {
+      // Create array from object properties
+      return numericKeys.map(key => ({
+        label: formatFieldLabel(key),
+        value: data[key] as number,
+      }));
+    }
+  }
+
+  return [];
 };
 
 // Structured view component for AI response
@@ -311,7 +370,7 @@ export function DataAnalysisPage() {
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [selectedMonthForDaily, setSelectedMonthForDaily] = useState<string | null>(null);
   const [aiChartContext, setAiChartContext] = useState<string>('');
-  const [showJsonView, setShowJsonView] = useState(false);
+  const [aiViewMode, setAiViewMode] = useState<'structured' | 'chart' | 'json'>('structured');
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -467,7 +526,7 @@ export function DataAnalysisPage() {
     setAiModal(true);
     setAiLoading(true);
     setAiResult(null);
-    setShowJsonView(false);
+    setAiViewMode('structured');
 
     try {
       const result = await externalApisApi.invoke(selectedApi.id, {
@@ -907,27 +966,38 @@ export function DataAnalysisPage() {
                     ? `Resposta recebida em ${aiResult.latency_ms}ms`
                     : aiResult.error}
                 </Alert>
-                <Button
-                  variant={showJsonView ? 'filled' : 'light'}
-                  color="gray"
-                  leftSection={showJsonView ? <IconList size={16} /> : <IconCode size={16} />}
-                  onClick={() => setShowJsonView(!showJsonView)}
-                >
-                  {showJsonView ? 'Estruturado' : 'JSON'}
-                </Button>
+                <SegmentedControl
+                  value={aiViewMode}
+                  onChange={(v) => setAiViewMode(v as 'structured' | 'chart' | 'json')}
+                  data={[
+                    { value: 'structured', label: 'Estruturado' },
+                    { value: 'chart', label: 'Grafico' },
+                    { value: 'json', label: 'JSON' },
+                  ]}
+                />
               </Group>
 
               {aiResult.response && (
                 <>
                   <Divider label="Resposta da IA" labelPosition="center" />
                   <Paper withBorder p="md" bg="gray.0">
-                    <ScrollArea h={300}>
-                      {showJsonView ? (
+                    {aiViewMode === 'json' ? (
+                      <ScrollArea h={300}>
                         <Code block>{JSON.stringify(aiResult.response, null, 2)}</Code>
-                      ) : (
+                      </ScrollArea>
+                    ) : aiViewMode === 'chart' ? (
+                      <ChartRenderer
+                        data={extractChartData(aiResult.response)}
+                        title={aiChartContext}
+                        chartType="auto"
+                        height={350}
+                        showStats={true}
+                      />
+                    ) : (
+                      <ScrollArea h={300}>
                         <StructuredResponseView data={aiResult.response} />
-                      )}
-                    </ScrollArea>
+                      </ScrollArea>
+                    )}
                   </Paper>
                 </>
               )}
@@ -935,7 +1005,7 @@ export function DataAnalysisPage() {
               <Divider label="Dados Enviados" labelPosition="center" />
               <Paper withBorder p="md" bg="gray.0">
                 <ScrollArea h={200}>
-                  {showJsonView ? (
+                  {aiViewMode === 'json' ? (
                     <Code block>{JSON.stringify(aiResult.request.body, null, 2)}</Code>
                   ) : (
                     <StructuredRequestView data={aiResult.request.body} />
