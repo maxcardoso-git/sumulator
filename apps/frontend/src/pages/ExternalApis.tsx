@@ -20,7 +20,6 @@ import {
   Code,
   ScrollArea,
   Tooltip,
-  Loader,
   Alert,
   JsonInput,
   Divider,

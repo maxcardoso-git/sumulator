@@ -710,7 +710,7 @@ export function DataAnalysisPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart
                   data={monthlyData}
-                  onClick={(state) => {
+                  onClick={(state: { activePayload?: Array<{ payload?: { month?: string } }> } | null) => {
                     if (state && state.activePayload && state.activePayload.length > 0) {
                       const month = state.activePayload[0]?.payload?.month;
                       if (month) {
