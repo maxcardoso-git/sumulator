@@ -40,6 +40,7 @@ import {
   IconTestPipe,
   IconLink,
   IconCopy,
+  IconClock,
 } from '@tabler/icons-react';
 import {
   externalApisApi,
@@ -55,6 +56,7 @@ export function ExternalApisPage() {
   const [testModal, setTestModal] = useState<ExternalApi | null>(null);
   const [testResult, setTestResult] = useState<InvokeExternalApiResult | null>(null);
   const [testLoading, setTestLoading] = useState(false);
+  const [testPayload, setTestPayload] = useState<string>('{}');
   const [activeTab, setActiveTab] = useState<string | null>('basic');
   const queryClient = useQueryClient();
 
@@ -207,12 +209,27 @@ export function ExternalApisPage() {
     }
   };
 
-  const handleTest = async (api: ExternalApi) => {
+  const handleTest = async (api: ExternalApi, withPayload = false) => {
     setTestModal(api);
     setTestResult(null);
     setTestLoading(true);
     try {
-      const result = await externalApisApi.test(api.id);
+      let payload: Record<string, unknown> | undefined;
+      if (withPayload) {
+        try {
+          const parsed = JSON.parse(testPayload);
+          payload = Object.keys(parsed).length > 0 ? parsed : undefined;
+        } catch {
+          notifications.show({
+            title: 'Erro',
+            message: 'Payload JSON invalido',
+            color: 'red',
+          });
+          setTestLoading(false);
+          return;
+        }
+      }
+      const result = await externalApisApi.invoke(api.id, payload ? { payload } : undefined);
       setTestResult(result);
       queryClient.invalidateQueries({ queryKey: ['external-apis'] });
     } catch (error) {
@@ -227,6 +244,30 @@ export function ExternalApisPage() {
     } finally {
       setTestLoading(false);
     }
+  };
+
+  const openTestModal = (api: ExternalApi) => {
+    setTestModal(api);
+    setTestResult(null);
+    setTestPayload('{\n  "exemplo": "dados de teste"\n}');
+  };
+
+  const getLatencyColor = (ms: number) => {
+    if (ms < 500) return 'green';
+    if (ms < 2000) return 'yellow';
+    return 'red';
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const openEditModal = (api: ExternalApi) => {
@@ -546,7 +587,7 @@ export function ExternalApisPage() {
                 <Table.Td>
                   <Group gap="xs">
                     <Tooltip label="Testar API">
-                      <ActionIcon variant="subtle" color="green" onClick={() => handleTest(api)}>
+                      <ActionIcon variant="subtle" color="green" onClick={() => openTestModal(api)}>
                         <IconTestPipe size={16} />
                       </ActionIcon>
                     </Tooltip>
@@ -598,73 +639,131 @@ export function ExternalApisPage() {
         opened={!!testModal}
         onClose={() => setTestModal(null)}
         title={`Teste: ${testModal?.name}`}
-        size="lg"
+        size="xl"
       >
         {testModal && (
           <Stack>
-            <Group>
-              <Text fw={500}>Endpoint:</Text>
-              <Code>{testModal.method} {testModal.baseUrl}{testModal.endpoint}</Code>
-            </Group>
-
-            {testLoading ? (
-              <Group justify="center" py="xl">
-                <Loader />
-                <Text>Executando teste...</Text>
+            <Paper withBorder p="sm" bg="gray.0">
+              <Group justify="space-between">
+                <Group gap="xs">
+                  <Badge variant="filled" color="blue">{testModal.method}</Badge>
+                  <Code>{testModal.baseUrl}{testModal.endpoint}</Code>
+                </Group>
+                {testModal.lastTestedAt && (
+                  <Group gap="xs">
+                    <IconClock size={14} color="gray" />
+                    <Text size="xs" c="dimmed">
+                      Ultimo teste: {formatDate(testModal.lastTestedAt)}
+                    </Text>
+                    {testModal.lastTestStatus && (
+                      <Badge size="xs" color={testModal.lastTestStatus === 'SUCCESS' ? 'green' : 'red'}>
+                        {testModal.lastTestStatus}
+                      </Badge>
+                    )}
+                  </Group>
+                )}
               </Group>
-            ) : testResult ? (
-              <Stack>
-                <Alert
-                  color={testResult.success ? 'green' : 'red'}
-                  title={testResult.success ? 'Sucesso' : 'Erro'}
-                  icon={testResult.success ? <IconCheck /> : <IconX />}
-                >
-                  {testResult.success
-                    ? `API respondeu em ${testResult.latency_ms}ms`
-                    : testResult.error}
-                </Alert>
+            </Paper>
 
-                <Divider label="Request" labelPosition="center" />
-                <Paper withBorder p="sm">
-                  <Text size="sm" fw={500} mb="xs">URL:</Text>
-                  <Code block>{testResult.request.url}</Code>
-                  <Text size="sm" fw={500} mt="sm" mb="xs">Headers:</Text>
-                  <ScrollArea h={100}>
-                    <Code block>{JSON.stringify(testResult.request.headers, null, 2)}</Code>
-                  </ScrollArea>
-                  {testResult.request.body !== null && testResult.request.body !== undefined && (
-                    <>
-                      <Text size="sm" fw={500} mt="sm" mb="xs">Body:</Text>
-                      <ScrollArea h={100}>
-                        <Code block>{JSON.stringify(testResult.request.body as Record<string, unknown>, null, 2)}</Code>
-                      </ScrollArea>
-                    </>
-                  )}
-                </Paper>
+            <Divider label="Payload de Teste (opcional)" labelPosition="center" />
+            <JsonInput
+              placeholder='{"exemplo": "dados de teste"}'
+              description="Os dados serao inseridos no placeholder {{DATA}} do request body"
+              autosize
+              minRows={4}
+              maxRows={8}
+              value={testPayload}
+              onChange={setTestPayload}
+              formatOnBlur
+              disabled={testLoading}
+            />
 
-                <Divider label="Response" labelPosition="center" />
-                <Paper withBorder p="sm">
-                  <ScrollArea h={200}>
-                    <Code block>
-                      {typeof testResult.response === 'string'
-                        ? testResult.response
-                        : JSON.stringify(testResult.response, null, 2)}
-                    </Code>
-                  </ScrollArea>
-                </Paper>
-              </Stack>
-            ) : null}
-
-            <Group justify="flex-end">
-              <Button variant="default" onClick={() => setTestModal(null)}>
-                Fechar
-              </Button>
+            <Group>
               <Button
                 leftSection={<IconPlayerPlay size={16} />}
-                onClick={() => handleTest(testModal)}
+                onClick={() => handleTest(testModal, true)}
+                loading={testLoading}
+                color="green"
+              >
+                Testar com Payload
+              </Button>
+              <Button
+                variant="light"
+                leftSection={<IconPlayerPlay size={16} />}
+                onClick={() => handleTest(testModal, false)}
                 loading={testLoading}
               >
-                Testar Novamente
+                Testar sem Payload
+              </Button>
+            </Group>
+
+            {testResult && (
+              <Stack>
+                <Divider label="Resultado" labelPosition="center" />
+
+                <Paper withBorder p="md">
+                  <Group justify="space-between" mb="md">
+                    <Group gap="md">
+                      <Badge
+                        size="lg"
+                        color={testResult.success ? 'green' : 'red'}
+                        leftSection={testResult.success ? <IconCheck size={14} /> : <IconX size={14} />}
+                      >
+                        {testResult.success ? 'Sucesso' : 'Erro'}
+                      </Badge>
+                      <Badge size="lg" color={getLatencyColor(testResult.latency_ms)} variant="light">
+                        {testResult.latency_ms}ms
+                      </Badge>
+                    </Group>
+                    {testResult.error && (
+                      <Text size="sm" c="red" fw={500}>{testResult.error}</Text>
+                    )}
+                  </Group>
+                </Paper>
+
+                <Tabs defaultValue="response">
+                  <Tabs.List>
+                    <Tabs.Tab value="response">Response</Tabs.Tab>
+                    <Tabs.Tab value="request">Request</Tabs.Tab>
+                  </Tabs.List>
+
+                  <Tabs.Panel value="response" pt="md">
+                    <Paper withBorder p="sm">
+                      <ScrollArea h={250}>
+                        <Code block>
+                          {typeof testResult.response === 'string'
+                            ? testResult.response
+                            : JSON.stringify(testResult.response, null, 2)}
+                        </Code>
+                      </ScrollArea>
+                    </Paper>
+                  </Tabs.Panel>
+
+                  <Tabs.Panel value="request" pt="md">
+                    <Paper withBorder p="sm">
+                      <Text size="sm" fw={500} mb="xs">URL:</Text>
+                      <Code block>{testResult.request.url}</Code>
+                      <Text size="sm" fw={500} mt="sm" mb="xs">Headers:</Text>
+                      <ScrollArea h={80}>
+                        <Code block>{JSON.stringify(testResult.request.headers, null, 2)}</Code>
+                      </ScrollArea>
+                      {testResult.request.body !== null && testResult.request.body !== undefined && (
+                        <>
+                          <Text size="sm" fw={500} mt="sm" mb="xs">Body:</Text>
+                          <ScrollArea h={100}>
+                            <Code block>{JSON.stringify(testResult.request.body as Record<string, unknown>, null, 2)}</Code>
+                          </ScrollArea>
+                        </>
+                      )}
+                    </Paper>
+                  </Tabs.Panel>
+                </Tabs>
+              </Stack>
+            )}
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setTestModal(null)}>
+                Fechar
               </Button>
             </Group>
           </Stack>
