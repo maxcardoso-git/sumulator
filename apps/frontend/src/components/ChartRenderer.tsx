@@ -259,13 +259,11 @@ function StatsDisplay({ stats, formatValue = formatCurrency }: { stats: ChartSta
 function HeatmapChart({
   data,
   xKey,
-  yKey,
   valueKey,
   height = 300,
 }: {
   data: DataPoint[];
   xKey: string;
-  yKey: string;
   valueKey: string;
   height?: number;
 }) {
@@ -444,7 +442,6 @@ export function ChartRenderer({
           <HeatmapChart
             data={data}
             xKey={xKey}
-            yKey={yKeys[0] || ''}
             valueKey={yKeys[0] || ''}
             height={height}
           />
