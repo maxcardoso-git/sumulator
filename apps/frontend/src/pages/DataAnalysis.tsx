@@ -33,6 +33,8 @@ import {
   IconRefresh,
   IconDatabaseOff,
   IconCalendar,
+  IconCode,
+  IconList,
 } from '@tabler/icons-react';
 import {
   BarChart,
@@ -97,6 +99,207 @@ const YEARS_OPTIONS = [
   { value: String(currentYear), label: String(currentYear) },
 ];
 
+// Helper function to format field labels
+const formatFieldLabel = (key: string): string => {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
+};
+
+// Helper function to format values
+const formatValue = (value: unknown): string => {
+  if (value === null || value === undefined) return '-';
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Nao';
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) return value.toLocaleString('pt-BR');
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.join(', ');
+  return JSON.stringify(value);
+};
+
+// Structured view component for AI response
+function StructuredResponseView({ data }: { data: unknown }) {
+  if (typeof data === 'string') {
+    return <Text style={{ whiteSpace: 'pre-wrap' }}>{data}</Text>;
+  }
+
+  if (!data || typeof data !== 'object') {
+    return <Text c="dimmed">Sem dados</Text>;
+  }
+
+  const renderValue = (value: unknown, depth = 0): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return <Text c="dimmed">-</Text>;
+    }
+
+    if (typeof value === 'string') {
+      return <Text style={{ whiteSpace: 'pre-wrap' }}>{value}</Text>;
+    }
+
+    if (typeof value === 'number') {
+      return <Text fw={500}>{formatValue(value)}</Text>;
+    }
+
+    if (typeof value === 'boolean') {
+      return <Text c={value ? 'green' : 'red'}>{value ? 'Sim' : 'Nao'}</Text>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return <Text c="dimmed">Lista vazia</Text>;
+      }
+      // Check if it's an array of simple values
+      if (value.every(v => typeof v !== 'object' || v === null)) {
+        return <Text>{value.map(v => formatValue(v)).join(', ')}</Text>;
+      }
+      // Array of objects
+      return (
+        <Stack gap="xs">
+          {value.map((item, index) => (
+            <Paper key={index} withBorder p="xs" bg="white">
+              <Text size="xs" c="dimmed" mb="xs">Item {index + 1}</Text>
+              {renderValue(item, depth + 1)}
+            </Paper>
+          ))}
+        </Stack>
+      );
+    }
+
+    if (typeof value === 'object') {
+      const entries = Object.entries(value);
+      return (
+        <Stack gap="xs">
+          {entries.map(([key, val]) => (
+            <Group key={key} align="flex-start" gap="xs" wrap="nowrap">
+              <Text size="sm" fw={600} c="dimmed" style={{ minWidth: 120 }}>
+                {formatFieldLabel(key)}:
+              </Text>
+              <div style={{ flex: 1 }}>{renderValue(val, depth + 1)}</div>
+            </Group>
+          ))}
+        </Stack>
+      );
+    }
+
+    return <Text>{String(value)}</Text>;
+  };
+
+  return renderValue(data);
+}
+
+// Structured view component for request data
+function StructuredRequestView({ data }: { data: Record<string, unknown> | null }) {
+  if (!data) {
+    return <Text c="dimmed">Sem dados</Text>;
+  }
+
+  const renderRequestData = (obj: Record<string, unknown>): React.ReactNode => {
+    const entries = Object.entries(obj);
+
+    return (
+      <Stack gap="sm">
+        {entries.map(([key, value]) => {
+          // Special handling for known fields
+          if (key === 'data' && typeof value === 'object' && value !== null) {
+            return (
+              <Paper key={key} withBorder p="sm" bg="white">
+                <Text fw={600} mb="xs">{formatFieldLabel(key)}</Text>
+                {renderNestedData(value as Record<string, unknown>)}
+              </Paper>
+            );
+          }
+
+          if (key === 'selected_months' && Array.isArray(value)) {
+            return (
+              <Group key={key} align="flex-start" gap="xs" wrap="nowrap">
+                <Text size="sm" fw={600} c="dimmed" style={{ minWidth: 130 }}>
+                  Meses Selecionados:
+                </Text>
+                <Group gap="xs">
+                  {value.map((month, i) => (
+                    <Text key={i} size="sm" span style={{ background: '#f1f3f5', padding: '2px 8px', borderRadius: 4 }}>
+                      {month}
+                    </Text>
+                  ))}
+                </Group>
+              </Group>
+            );
+          }
+
+          return (
+            <Group key={key} align="flex-start" gap="xs" wrap="nowrap">
+              <Text size="sm" fw={600} c="dimmed" style={{ minWidth: 130 }}>
+                {formatFieldLabel(key)}:
+              </Text>
+              <Text size="sm">{formatValue(value)}</Text>
+            </Group>
+          );
+        })}
+      </Stack>
+    );
+  };
+
+  const renderNestedData = (obj: Record<string, unknown>): React.ReactNode => {
+    const entries = Object.entries(obj);
+
+    return (
+      <Stack gap="xs">
+        {entries.map(([key, value]) => {
+          if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+            // Array of objects (like monthly_totals)
+            return (
+              <div key={key}>
+                <Text size="sm" fw={600} c="dimmed" mb="xs">{formatFieldLabel(key)}:</Text>
+                <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="xs">
+                  {value.slice(0, 12).map((item, index) => (
+                    <Paper key={index} withBorder p="xs" bg="gray.0">
+                      {Object.entries(item as Record<string, unknown>).map(([k, v]) => (
+                        <Text key={k} size="xs">
+                          <Text span fw={600}>{formatFieldLabel(k)}:</Text> {formatValue(v)}
+                        </Text>
+                      ))}
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+              </div>
+            );
+          }
+
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // Nested object (like summary)
+            return (
+              <Paper key={key} withBorder p="xs" bg="gray.0">
+                <Text size="sm" fw={600} mb="xs">{formatFieldLabel(key)}</Text>
+                <Group gap="lg">
+                  {Object.entries(value).map(([k, v]) => (
+                    <div key={k}>
+                      <Text size="xs" c="dimmed">{formatFieldLabel(k)}</Text>
+                      <Text size="sm" fw={500}>{formatValue(v)}</Text>
+                    </div>
+                  ))}
+                </Group>
+              </Paper>
+            );
+          }
+
+          return (
+            <Group key={key} align="center" gap="xs">
+              <Text size="sm" fw={600} c="dimmed">{formatFieldLabel(key)}:</Text>
+              <Text size="sm">{formatValue(value)}</Text>
+            </Group>
+          );
+        })}
+      </Stack>
+    );
+  };
+
+  return renderRequestData(data);
+}
+
 export function DataAnalysisPage() {
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [aiModal, setAiModal] = useState(false);
@@ -108,6 +311,7 @@ export function DataAnalysisPage() {
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [selectedMonthForDaily, setSelectedMonthForDaily] = useState<string | null>(null);
   const [aiChartContext, setAiChartContext] = useState<string>('');
+  const [showJsonView, setShowJsonView] = useState(false);
 
   const { data: forms } = useQuery({
     queryKey: ['forms'],
@@ -263,6 +467,7 @@ export function DataAnalysisPage() {
     setAiModal(true);
     setAiLoading(true);
     setAiResult(null);
+    setShowJsonView(false);
 
     try {
       const result = await externalApisApi.invoke(selectedApi.id, {
@@ -676,7 +881,7 @@ export function DataAnalysisPage() {
         opened={aiModal}
         onClose={() => setAiModal(false)}
         title={`Analise com IA${aiChartContext ? ` - ${aiChartContext}` : ''}`}
-        size="lg"
+        size="xl"
       >
         <Stack>
           {aiLoading ? (
@@ -688,25 +893,36 @@ export function DataAnalysisPage() {
             </Center>
           ) : aiResult ? (
             <>
-              <Alert
-                color={aiResult.success ? 'green' : 'red'}
-                title={aiResult.success ? 'Analise Concluida' : 'Erro na Analise'}
-                icon={aiResult.success ? <IconCheck /> : <IconX />}
-              >
-                {aiResult.success
-                  ? `Resposta recebida em ${aiResult.latency_ms}ms`
-                  : aiResult.error}
-              </Alert>
+              <Group justify="space-between" align="center">
+                <Alert
+                  color={aiResult.success ? 'green' : 'red'}
+                  title={aiResult.success ? 'Analise Concluida' : 'Erro na Analise'}
+                  icon={aiResult.success ? <IconCheck /> : <IconX />}
+                  style={{ flex: 1 }}
+                >
+                  {aiResult.success
+                    ? `Resposta recebida em ${aiResult.latency_ms}ms`
+                    : aiResult.error}
+                </Alert>
+                <Button
+                  variant={showJsonView ? 'filled' : 'light'}
+                  color="gray"
+                  leftSection={showJsonView ? <IconList size={16} /> : <IconCode size={16} />}
+                  onClick={() => setShowJsonView(!showJsonView)}
+                >
+                  {showJsonView ? 'Estruturado' : 'JSON'}
+                </Button>
+              </Group>
 
               {aiResult.response && (
                 <>
                   <Divider label="Resposta da IA" labelPosition="center" />
                   <Paper withBorder p="md" bg="gray.0">
                     <ScrollArea h={300}>
-                      {typeof aiResult.response === 'string' ? (
-                        <Text style={{ whiteSpace: 'pre-wrap' }}>{aiResult.response}</Text>
-                      ) : (
+                      {showJsonView ? (
                         <Code block>{JSON.stringify(aiResult.response, null, 2)}</Code>
+                      ) : (
+                        <StructuredResponseView data={aiResult.response} />
                       )}
                     </ScrollArea>
                   </Paper>
@@ -714,9 +930,13 @@ export function DataAnalysisPage() {
               )}
 
               <Divider label="Dados Enviados" labelPosition="center" />
-              <Paper withBorder p="sm">
-                <ScrollArea h={150}>
-                  <Code block>{JSON.stringify(aiResult.request.body, null, 2)}</Code>
+              <Paper withBorder p="md" bg="gray.0">
+                <ScrollArea h={200}>
+                  {showJsonView ? (
+                    <Code block>{JSON.stringify(aiResult.request.body, null, 2)}</Code>
+                  ) : (
+                    <StructuredRequestView data={aiResult.request.body} />
+                  )}
                 </ScrollArea>
               </Paper>
             </>
