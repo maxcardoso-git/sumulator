@@ -710,12 +710,11 @@ export function DataAnalysisPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart
                   data={monthlyData}
-                  onClick={(state: { activePayload?: Array<{ payload?: { month?: string } }> } | null) => {
-                    if (state && state.activePayload && state.activePayload.length > 0) {
-                      const month = state.activePayload[0]?.payload?.month;
-                      if (month) {
-                        setSelectedMonthForDaily(prev => prev === month ? null : month);
-                      }
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  onClick={(state: any) => {
+                    if (state?.activePayload?.[0]?.payload?.month) {
+                      const month = state.activePayload[0].payload.month;
+                      setSelectedMonthForDaily(prev => prev === month ? null : month);
                     }
                   }}
                 >
