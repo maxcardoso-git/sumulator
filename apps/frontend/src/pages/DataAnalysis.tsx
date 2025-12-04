@@ -708,17 +708,7 @@ export function DataAnalysisPage() {
                 <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
               </Group>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={monthlyData}
-                  onClick={(state: unknown) => {
-                    const chartState = state as { activePayload?: { payload?: { month?: string } }[] } | null;
-                    if (chartState?.activePayload?.[0]?.payload?.month) {
-                      const month = chartState.activePayload[0].payload.month;
-                      setSelectedMonthForDaily(prev => prev === month ? null : month);
-                    }
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
+                <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -726,7 +716,17 @@ export function DataAnalysisPage() {
                     formatter={(value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   />
                   <Legend />
-                  <Bar dataKey="total" name="Valor Total">
+                  <Bar
+                    dataKey="total"
+                    name="Valor Total"
+                    cursor="pointer"
+                    onClick={(data: { payload?: { month: string } }) => {
+                      const month = data?.payload?.month;
+                      if (month) {
+                        setSelectedMonthForDaily(prev => prev === month ? null : month);
+                      }
+                    }}
+                  >
                     {monthlyData.map((entry) => (
                       <Cell
                         key={`cell-${entry.month}`}
