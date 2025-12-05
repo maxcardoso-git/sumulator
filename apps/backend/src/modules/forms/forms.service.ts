@@ -244,7 +244,7 @@ export class FormsService {
       monthlyData[month].count++;
 
       // Try to extract value from common field names
-      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price'];
+      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price', 'nota_geral', 'nota', 'rating', 'score'];
       let value = 0;
       for (const field of valueFields) {
         if (typeof data[field] === 'number') {
@@ -330,7 +330,7 @@ export class FormsService {
 
       dailyData[day].count++;
 
-      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price'];
+      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price', 'nota_geral', 'nota', 'rating', 'score'];
       for (const field of valueFields) {
         if (typeof data[field] === 'number') {
           dailyData[day].total += data[field] as number;
