@@ -748,7 +748,14 @@ export function DataAnalysisPage() {
                 <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis />
+                  <YAxis
+                    tickFormatter={(value: number) => {
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                      return value.toString();
+                    }}
+                    width={80}
+                  />
                   <RechartsTooltip
                     formatter={(value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   />
@@ -879,7 +886,20 @@ export function DataAnalysisPage() {
                   <BarChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="day" />
-                    <YAxis />
+                    <YAxis
+                      yAxisId="left"
+                      tickFormatter={(value: number) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                        return value.toString();
+                      }}
+                      width={70}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      width={50}
+                    />
                     <RechartsTooltip
                       formatter={(value: number, name: string) => {
                         if (name === 'Valor Total') {
@@ -889,8 +909,8 @@ export function DataAnalysisPage() {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="total" name="Valor Total" fill="#40c057" />
-                    <Bar dataKey="count" name="Quantidade" fill="#228be6" />
+                    <Bar dataKey="total" name="Valor Total" fill="#40c057" yAxisId="left" />
+                    <Bar dataKey="count" name="Quantidade" fill="#228be6" yAxisId="right" />
                   </BarChart>
                 </ResponsiveContainer>
               </Paper>
