@@ -294,7 +294,7 @@ export function DataGeneratorPage() {
       refetchStats();
       closeDeleteModal();
       const totalDeleted =
-        data.deleted.transactions_deleted + data.deleted.operational_events_deleted;
+        data.deleted.transactions_deleted + data.deleted.operational_events_deleted + data.deleted.form_submissions_deleted;
       notifications.show({
         title: 'Dados apagados',
         message: `${totalDeleted} registros removidos com sucesso`,
@@ -1144,6 +1144,7 @@ export function DataGeneratorPage() {
                 { value: 'all', label: 'Todas as tabelas' },
                 { value: 'transactions', label: 'Apenas Transações' },
                 { value: 'operational_events', label: 'Apenas Eventos Operacionais' },
+                { value: 'form_submissions', label: 'Apenas Dados de Formulários' },
               ]}
               {...deleteForm.getInputProps('target_table')}
             />

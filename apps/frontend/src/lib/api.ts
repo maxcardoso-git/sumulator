@@ -414,7 +414,7 @@ export interface OrchestratorCall {
 }
 
 export interface DeleteDataInput {
-  target_table: 'transactions' | 'operational_events' | 'all';
+  target_table: 'transactions' | 'operational_events' | 'form_submissions' | 'all';
   only_simulator_data?: boolean;
   from_date?: string;
   to_date?: string;
@@ -425,6 +425,7 @@ export interface DeleteDataResult {
   deleted: {
     transactions_deleted: number;
     operational_events_deleted: number;
+    form_submissions_deleted: number;
   };
 }
 

@@ -217,7 +217,7 @@ export class DataGeneratorService {
   }
 
   async clearData(dto: DeleteDataDto) {
-    const results = { transactions_deleted: 0, operational_events_deleted: 0 };
+    const results = { transactions_deleted: 0, operational_events_deleted: 0, form_submissions_deleted: 0 };
 
     const buildWhere = (onlySimulator?: boolean, fromDate?: string, toDate?: string) => {
       const where: Prisma.TransactionWhereInput = {};
@@ -252,6 +252,31 @@ export class DataGeneratorService {
       const where = buildWhere(dto.only_simulator_data, dto.from_date, dto.to_date) as Prisma.OperationalEventWhereInput;
       const result = await this.prisma.operationalEvent.deleteMany({ where });
       results.operational_events_deleted = result.count;
+    }
+
+    if (dto.target_table === 'form_submissions' || dto.target_table === 'all') {
+      const where: Prisma.FormSubmissionWhereInput = {};
+
+      // Para form_submissions, filtra por dados gerados pelo data_generator
+      if (dto.only_simulator_data) {
+        where.data = {
+          path: ['_source'],
+          equals: 'data_generator',
+        };
+      }
+
+      if (dto.from_date || dto.to_date) {
+        where.createdAt = {};
+        if (dto.from_date) {
+          where.createdAt.gte = new Date(dto.from_date);
+        }
+        if (dto.to_date) {
+          where.createdAt.lte = new Date(dto.to_date);
+        }
+      }
+
+      const result = await this.prisma.formSubmission.deleteMany({ where });
+      results.form_submissions_deleted = result.count;
     }
 
     return {

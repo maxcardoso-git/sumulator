@@ -2,8 +2,8 @@ import { IsString, IsNumber, IsOptional, IsObject, IsBoolean, IsUUID, IsIn, Min,
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DeleteDataDto {
-  @ApiProperty({ example: 'transactions', enum: ['transactions', 'operational_events', 'all'] })
-  @IsIn(['transactions', 'operational_events', 'all'])
+  @ApiProperty({ example: 'transactions', enum: ['transactions', 'operational_events', 'form_submissions', 'all'] })
+  @IsIn(['transactions', 'operational_events', 'form_submissions', 'all'])
   target_table: string;
 
   @ApiPropertyOptional({ description: 'Apagar apenas dados gerados pelo simulador' })
