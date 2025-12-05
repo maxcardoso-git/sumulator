@@ -1,9 +1,8 @@
 # Build stage
 FROM node:20-alpine AS builder
 
-# Build arguments for version info
-ARG GIT_COMMIT_HASH=unknown
-ARG BUILD_DATE
+# Install git for version detection
+RUN apk add --no-cache git
 
 WORKDIR /app
 
@@ -14,16 +13,20 @@ COPY apps/frontend/package*.json ./apps/frontend/
 # Install dependencies
 RUN npm install
 
+# Copy .git directory to get commit hash (will be excluded from final image)
+COPY .git ./.git
+
+# Get git commit hash and build date
+RUN GIT_HASH=$(git rev-parse HEAD 2>/dev/null || echo "unknown") && \
+    echo "VITE_GIT_COMMIT_HASH=${GIT_HASH}" > /tmp/build-env && \
+    echo "VITE_BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /tmp/build-env
+
 # Copy source
 COPY apps/frontend ./apps/frontend
 
-# Set environment variables for Vite build
-ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
-ENV VITE_BUILD_DATE=$BUILD_DATE
-
-# Build
+# Load build environment and build
 WORKDIR /app/apps/frontend
-RUN npm run build
+RUN export $(cat /tmp/build-env | xargs) && npm run build
 
 # Production stage - serve with nginx
 FROM nginx:alpine AS production
