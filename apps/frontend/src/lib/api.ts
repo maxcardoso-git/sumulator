@@ -116,6 +116,10 @@ export const formsApi = {
   getSubmissions: (formId: string) => api.get(`/forms/${formId}/submissions`),
   getStats: (formId?: string) =>
     api.get<FormSubmissionsStats>(`/forms/stats/summary${formId ? `?form_id=${formId}` : ''}`),
+  getMonthlyStats: (formId: string, year?: number) =>
+    api.get<FormMonthlyStats>(`/forms/${formId}/stats/monthly${year ? `?year=${year}` : ''}`),
+  getDailyStats: (formId: string, year: number, month: number) =>
+    api.get<FormDailyStats>(`/forms/${formId}/stats/daily?year=${year}&month=${month}`),
 };
 
 // Data Generator API
@@ -439,6 +443,40 @@ export interface FormSubmissionsStats {
     total: number;
     data_generator_generated: number;
   };
+}
+
+export interface MonthlyStatsData {
+  month: string;
+  monthIndex: number;
+  total: number;
+  count: number;
+  avg: number;
+  min: number;
+  max: number;
+  byType: Record<string, number>;
+}
+
+export interface FormMonthlyStats {
+  year: number;
+  months: MonthlyStatsData[];
+  summary: {
+    totalCount: number;
+    totalValue: number;
+    avgValue: number;
+  };
+}
+
+export interface DailyStatsData {
+  day: number;
+  count: number;
+  total: number;
+  avg: number;
+}
+
+export interface FormDailyStats {
+  year: number;
+  month: number;
+  days: DailyStatsData[];
 }
 
 // External APIs

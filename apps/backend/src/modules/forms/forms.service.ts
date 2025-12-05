@@ -202,6 +202,155 @@ export class FormsService {
     };
   }
 
+  async getMonthlyStats(formId: string, year?: number) {
+    const targetYear = year || new Date().getFullYear();
+    const startDate = new Date(targetYear, 0, 1);
+    const endDate = new Date(targetYear + 1, 0, 1);
+
+    // Get all submissions for the form in the specified year
+    const submissions = await this.prisma.formSubmission.findMany({
+      where: {
+        formId,
+        createdAt: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      select: {
+        id: true,
+        data: true,
+        createdAt: true,
+      },
+    });
+
+    // Aggregate by month
+    const monthlyData: Record<number, {
+      count: number;
+      total: number;
+      values: number[];
+      byType: Record<string, number>;
+    }> = {};
+
+    // Initialize all months
+    for (let i = 0; i < 12; i++) {
+      monthlyData[i] = { count: 0, total: 0, values: [], byType: {} };
+    }
+
+    // Process submissions
+    for (const submission of submissions) {
+      const month = submission.createdAt.getMonth();
+      const data = submission.data as Record<string, unknown>;
+
+      monthlyData[month].count++;
+
+      // Try to extract value from common field names
+      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price'];
+      let value = 0;
+      for (const field of valueFields) {
+        if (typeof data[field] === 'number') {
+          value = data[field] as number;
+          break;
+        }
+      }
+      monthlyData[month].total += value;
+      if (value > 0) {
+        monthlyData[month].values.push(value);
+      }
+
+      // Try to extract type from common field names
+      const typeFields = ['tipo', 'type', 'categoria', 'category'];
+      for (const field of typeFields) {
+        if (typeof data[field] === 'string') {
+          const type = data[field] as string;
+          monthlyData[month].byType[type] = (monthlyData[month].byType[type] || 0) + 1;
+          break;
+        }
+      }
+    }
+
+    // Format response
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const result = months.map((month, index) => {
+      const data = monthlyData[index];
+      const values = data.values;
+      return {
+        month,
+        monthIndex: index,
+        total: data.total,
+        count: data.count,
+        avg: data.count > 0 ? Math.round(data.total / data.count) : 0,
+        min: values.length > 0 ? Math.min(...values) : 0,
+        max: values.length > 0 ? Math.max(...values) : 0,
+        byType: data.byType,
+      };
+    });
+
+    return {
+      year: targetYear,
+      months: result,
+      summary: {
+        totalCount: submissions.length,
+        totalValue: result.reduce((acc, m) => acc + m.total, 0),
+        avgValue: submissions.length > 0
+          ? Math.round(result.reduce((acc, m) => acc + m.total, 0) / submissions.length)
+          : 0,
+      },
+    };
+  }
+
+  async getDailyStats(formId: string, year: number, month: number) {
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const submissions = await this.prisma.formSubmission.findMany({
+      where: {
+        formId,
+        createdAt: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+      select: {
+        data: true,
+        createdAt: true,
+      },
+    });
+
+    // Initialize daily data
+    const dailyData: Record<number, { count: number; total: number }> = {};
+    for (let i = 1; i <= daysInMonth; i++) {
+      dailyData[i] = { count: 0, total: 0 };
+    }
+
+    // Process submissions
+    for (const submission of submissions) {
+      const day = submission.createdAt.getDate();
+      const data = submission.data as Record<string, unknown>;
+
+      dailyData[day].count++;
+
+      const valueFields = ['valor', 'value', 'amount', 'total', 'preco', 'price'];
+      for (const field of valueFields) {
+        if (typeof data[field] === 'number') {
+          dailyData[day].total += data[field] as number;
+          break;
+        }
+      }
+    }
+
+    return {
+      year,
+      month,
+      days: Object.entries(dailyData).map(([day, data]) => ({
+        day: parseInt(day),
+        count: data.count,
+        total: data.total,
+        avg: data.count > 0 ? Math.round(data.total / data.count) : 0,
+      })),
+    };
+  }
+
   private validateFormData(
     schema: Record<string, unknown>,
     data: Record<string, unknown>,

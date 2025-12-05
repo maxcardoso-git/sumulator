@@ -56,6 +56,8 @@ import {
   externalApisApi,
   ExternalApi,
   InvokeExternalApiResult,
+  FormMonthlyStats,
+  FormDailyStats,
 } from '../lib/api';
 
 const COLORS = ['#228be6', '#40c057', '#fab005', '#fa5252', '#7950f2', '#15aabf', '#fd7e14', '#e64980'];
@@ -365,7 +367,6 @@ export function DataAnalysisPage() {
   const [aiResult, setAiResult] = useState<InvokeExternalApiResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedApi, setSelectedApi] = useState<ExternalApi | null>(null);
-  const [dataSeed, setDataSeed] = useState<number>(Date.now());
   const [selectedMonths, setSelectedMonths] = useState<string[]>(MONTHS_OPTIONS.map(m => m.value));
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [selectedMonthForDaily, setSelectedMonthForDaily] = useState<string | null>(null);
@@ -380,13 +381,29 @@ export function DataAnalysisPage() {
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['form-submissions-stats', selectedFormId],
     queryFn: () => formsApi.getStats(selectedFormId || undefined),
-    enabled: !!selectedFormId, // Only fetch when a form is selected
+    enabled: !!selectedFormId,
+  });
+
+  // Fetch real monthly stats from API
+  const { data: monthlyStatsData, isLoading: monthlyStatsLoading } = useQuery({
+    queryKey: ['form-monthly-stats', selectedFormId, selectedYear],
+    queryFn: () => formsApi.getMonthlyStats(selectedFormId!, parseInt(selectedYear)),
+    enabled: !!selectedFormId,
+  });
+
+  // Fetch real daily stats from API
+  const { data: dailyStatsData, isLoading: dailyStatsLoading } = useQuery({
+    queryKey: ['form-daily-stats', selectedFormId, selectedYear, selectedMonthForDaily],
+    queryFn: () => {
+      const monthIndex = MONTHS_OPTIONS.findIndex(m => m.value === selectedMonthForDaily);
+      return formsApi.getDailyStats(selectedFormId!, parseInt(selectedYear), monthIndex);
+    },
+    enabled: !!selectedFormId && !!selectedMonthForDaily,
   });
 
   const handleFormChange = (formId: string | null) => {
     setSelectedFormId(formId);
     setSelectedApi(null);
-    setDataSeed(Date.now()); // Force data regeneration
     refetchStats();
   };
 
@@ -405,46 +422,23 @@ export function DataAnalysisPage() {
     }
   }, [availableApis]);
 
-  // Seeded random number generator for consistent data per form
-  const seededRandom = (seed: number, index: number) => {
-    const x = Math.sin(seed + index) * 10000;
-    return x - Math.floor(x);
-  };
-
-  // Simulated monthly data (in a real app, this would come from an API)
+  // Transform API monthly stats to chart data format
   const monthlyData = useMemo<TransactionData[]>(() => {
-    if (!stats?.form_submissions?.total) return [];
+    if (!monthlyStatsData?.months) return [];
 
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const total = stats.form_submissions.total;
-    const perMonth = Math.floor(total / 12);
-
-    // Generate data for all months, then filter
-    const allMonthsData = months.map((month, index) => {
-      const yearSeed = parseInt(selectedYear) * 1000;
-      const variance = seededRandom(dataSeed + yearSeed, index) * 0.4 - 0.2; // -20% to +20%
-      const count = Math.max(1, Math.floor(perMonth * (1 + variance)));
-      const avgValue = 1000 + seededRandom(dataSeed + yearSeed, index + 12) * 4000;
-
-      return {
-        month,
-        total: Math.round(count * avgValue),
-        count,
-        avg: Math.round(avgValue),
-        min: Math.round(avgValue * 0.3),
-        max: Math.round(avgValue * 2.5),
-        byType: {
-          'Venda': Math.floor(count * 0.45),
-          'Servico': Math.floor(count * 0.25),
-          'Assinatura': Math.floor(count * 0.20),
-          'Outro': Math.floor(count * 0.10),
-        },
-      };
-    });
-
-    // Filter by selected months
-    return allMonthsData.filter(m => selectedMonths.includes(m.month));
-  }, [stats, dataSeed, selectedMonths, selectedYear]);
+    // Filter by selected months and transform to chart format
+    return monthlyStatsData.months
+      .filter(m => selectedMonths.includes(m.month))
+      .map(m => ({
+        month: m.month,
+        total: m.total,
+        count: m.count,
+        avg: m.avg,
+        min: m.min,
+        max: m.max,
+        byType: m.byType,
+      }));
+  }, [monthlyStatsData, selectedMonths]);
 
   const pieData = useMemo(() => {
     if (!monthlyData.length) return [];
@@ -459,7 +453,15 @@ export function DataAnalysisPage() {
     return Object.entries(totals).map(([name, value]) => ({ name, value }));
   }, [monthlyData]);
 
+  // Calculate total stats from real monthly data or API summary
   const totalStats = useMemo(() => {
+    if (monthlyStatsData?.summary) {
+      return {
+        total: monthlyStatsData.summary.totalValue,
+        count: monthlyStatsData.summary.totalCount,
+        avg: monthlyStatsData.summary.avgValue,
+      };
+    }
     if (!monthlyData.length) return { total: 0, count: 0, avg: 0 };
 
     const total = monthlyData.reduce((acc, m) => acc + m.total, 0);
@@ -470,41 +472,19 @@ export function DataAnalysisPage() {
       count,
       avg: count > 0 ? Math.round(total / count) : 0,
     };
-  }, [monthlyData]);
+  }, [monthlyData, monthlyStatsData]);
 
-  // Generate daily data for selected month
+  // Transform API daily stats to chart data format
   const dailyData = useMemo<DailyData[]>(() => {
-    if (!selectedMonthForDaily || !stats?.form_submissions?.total) return [];
+    if (!dailyStatsData?.days) return [];
 
-    const monthIndex = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].indexOf(selectedMonthForDaily);
-    if (monthIndex === -1) return [];
-
-    // Get days in month
-    const year = parseInt(selectedYear);
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-
-    // Get the monthly data for this month
-    const monthData = monthlyData.find(m => m.month === selectedMonthForDaily);
-    if (!monthData) return [];
-
-    const dailyCount = Math.floor(monthData.count / daysInMonth);
-    const dailyTotal = Math.floor(monthData.total / daysInMonth);
-
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const daySeed = dataSeed + year * 1000 + monthIndex * 100 + day;
-      const variance = seededRandom(daySeed, day) * 0.6 - 0.3; // -30% to +30%
-      const count = Math.max(1, Math.floor(dailyCount * (1 + variance)));
-      const total = Math.round(dailyTotal * (1 + variance));
-
-      return {
-        day,
-        total,
-        count,
-        avg: count > 0 ? Math.round(total / count) : 0,
-      };
-    });
-  }, [selectedMonthForDaily, stats, selectedYear, monthlyData, dataSeed, seededRandom]);
+    return dailyStatsData.days.map(d => ({
+      day: d.day,
+      total: d.total,
+      count: d.count,
+      avg: d.avg,
+    }));
+  }, [dailyStatsData]);
 
   // Get full month name for display
   const getMonthFullName = (abbr: string) => {

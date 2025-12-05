@@ -73,4 +73,20 @@ export class FormsController {
   async getSubmissions(@Param('id') id: string) {
     return this.formsService.getSubmissions(id);
   }
+
+  @Get(':id/stats/monthly')
+  @ApiOperation({ summary: 'Obter estatísticas mensais de submissões' })
+  async getMonthlyStats(@Param('id') id: string, @Query('year') year?: string) {
+    return this.formsService.getMonthlyStats(id, year ? parseInt(year) : undefined);
+  }
+
+  @Get(':id/stats/daily')
+  @ApiOperation({ summary: 'Obter estatísticas diárias de submissões' })
+  async getDailyStats(
+    @Param('id') id: string,
+    @Query('year') year: string,
+    @Query('month') month: string,
+  ) {
+    return this.formsService.getDailyStats(id, parseInt(year), parseInt(month));
+  }
 }
