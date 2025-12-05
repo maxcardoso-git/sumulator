@@ -745,16 +745,7 @@ export function DataAnalysisPage() {
                 <Text size="xs" c="dimmed">Clique em uma barra para ver detalhes diarios</Text>
               </Group>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={monthlyData}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onClick={(state: any) => {
-                    if (state?.activePayload?.[0]?.payload?.month) {
-                      const month = state.activePayload[0].payload.month;
-                      setSelectedMonthForDaily(prev => prev === month ? null : month);
-                    }
-                  }}
-                >
+                <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -766,6 +757,12 @@ export function DataAnalysisPage() {
                     dataKey="total"
                     name="Valor Total"
                     cursor="pointer"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    onClick={(data: any) => {
+                      if (data?.month) {
+                        setSelectedMonthForDaily(prev => prev === data.month ? null : data.month);
+                      }
+                    }}
                   >
                     {monthlyData.map((entry) => (
                       <Cell
