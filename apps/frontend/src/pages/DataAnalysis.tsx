@@ -56,8 +56,6 @@ import {
   externalApisApi,
   ExternalApi,
   InvokeExternalApiResult,
-  FormMonthlyStats,
-  FormDailyStats,
 } from '../lib/api';
 
 const COLORS = ['#228be6', '#40c057', '#fab005', '#fa5252', '#7950f2', '#15aabf', '#fd7e14', '#e64980'];
@@ -385,14 +383,14 @@ export function DataAnalysisPage() {
   });
 
   // Fetch real monthly stats from API
-  const { data: monthlyStatsData, isLoading: monthlyStatsLoading } = useQuery({
+  const { data: monthlyStatsData } = useQuery({
     queryKey: ['form-monthly-stats', selectedFormId, selectedYear],
     queryFn: () => formsApi.getMonthlyStats(selectedFormId!, parseInt(selectedYear)),
     enabled: !!selectedFormId,
   });
 
   // Fetch real daily stats from API
-  const { data: dailyStatsData, isLoading: dailyStatsLoading } = useQuery({
+  const { data: dailyStatsData } = useQuery({
     queryKey: ['form-daily-stats', selectedFormId, selectedYear, selectedMonthForDaily],
     queryFn: () => {
       const monthIndex = MONTHS_OPTIONS.findIndex(m => m.value === selectedMonthForDaily);
