@@ -204,17 +204,11 @@ export class FormsService {
 
   async getMonthlyStats(formId: string, year?: number) {
     const targetYear = year || new Date().getFullYear();
-    const startDate = new Date(targetYear, 0, 1);
-    const endDate = new Date(targetYear + 1, 0, 1);
 
-    // Get all submissions for the form in the specified year
+    // Get ALL submissions for the form (we'll filter by year based on _generated_at or createdAt)
     const submissions = await this.prisma.formSubmission.findMany({
       where: {
         formId,
-        createdAt: {
-          gte: startDate,
-          lt: endDate,
-        },
       },
       select: {
         id: true,
@@ -238,8 +232,22 @@ export class FormsService {
 
     // Process submissions
     for (const submission of submissions) {
-      const month = submission.createdAt.getMonth();
       const data = submission.data as Record<string, unknown>;
+
+      // Use _generated_at from data if available (for data generator submissions), otherwise use createdAt
+      let submissionDate: Date;
+      if (data._generated_at && typeof data._generated_at === 'string') {
+        submissionDate = new Date(data._generated_at);
+      } else {
+        submissionDate = submission.createdAt;
+      }
+
+      // Filter by year
+      if (submissionDate.getFullYear() !== targetYear) {
+        continue;
+      }
+
+      const month = submissionDate.getMonth();
 
       monthlyData[month].count++;
 
@@ -299,17 +307,12 @@ export class FormsService {
   }
 
   async getDailyStats(formId: string, year: number, month: number) {
-    const startDate = new Date(year, month, 1);
-    const endDate = new Date(year, month + 1, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    // Get ALL submissions for the form (we'll filter by month based on _generated_at or createdAt)
     const submissions = await this.prisma.formSubmission.findMany({
       where: {
         formId,
-        createdAt: {
-          gte: startDate,
-          lt: endDate,
-        },
       },
       select: {
         data: true,
@@ -325,8 +328,27 @@ export class FormsService {
 
     // Process submissions
     for (const submission of submissions) {
-      const day = submission.createdAt.getDate();
       const data = submission.data as Record<string, unknown>;
+
+      // Use _generated_at from data if available (for data generator submissions), otherwise use createdAt
+      let submissionDate: Date;
+      if (data._generated_at && typeof data._generated_at === 'string') {
+        submissionDate = new Date(data._generated_at);
+      } else {
+        submissionDate = submission.createdAt;
+      }
+
+      // Filter by year and month
+      if (submissionDate.getFullYear() !== year || submissionDate.getMonth() !== month) {
+        continue;
+      }
+
+      const day = submissionDate.getDate();
+
+      // Ensure day is within valid range
+      if (day < 1 || day > daysInMonth) {
+        continue;
+      }
 
       dailyData[day].count++;
 
