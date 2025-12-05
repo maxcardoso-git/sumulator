@@ -227,7 +227,12 @@ function generateDataFromSchema(
     for (const [fieldName, fieldSchema] of Object.entries(properties)) {
       row[fieldName] = generateValueForField(fieldName, fieldSchema, dateTimeOptions);
     }
-    row._generated_at = new Date().toISOString();
+    // Use the configured dateTimeOptions for _generated_at so charts group data correctly
+    if (dateTimeOptions) {
+      row._generated_at = generateDateTime(dateTimeOptions).toISOString();
+    } else {
+      row._generated_at = new Date().toISOString();
+    }
     row._row_index = i + 1;
     data.push(row);
   }
